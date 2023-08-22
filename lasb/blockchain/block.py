@@ -1,17 +1,18 @@
 import logging
 
 from utils import Utils
-from pprint import pprint
 from datetime import datetime
 
 class Block(object):
     utils = Utils()
-    def forge(self,index,previous_hash,transactions):
+    def forge(self,index,previous_hash,transactions,shard=None):
         block = {'index': index,
                  'nonce': 0,
                  'previous_hash': previous_hash,
                  'timestamp': str(datetime.now()),
                  'transactions': transactions}
+        if shard:
+            block['shard'] = shard
         if self.validate(block):
             return block
         return False
@@ -22,6 +23,8 @@ class Block(object):
 
         validate = self.Validate(block)
         if validate.keys() and validate.values() and validate.proof():
+            if block.get('shard') and not validate.shard():
+                return False
             block['hash'] = validate.block_hash
             return True
         return False
@@ -55,6 +58,12 @@ class Block(object):
 
         def values(self):
             if self.utils.validate_dict_values(self.block, self.block_required_items):
+                return True
+            return False
+        
+        def shard(self):
+            self.block_required_items.update({'shard':str})
+            if self.utils.validate_dict_keys(self.block,self.block_required_items) and self.utils.validate_dict_values(self.block, self.block_required_items):
                 return True
             return False
 

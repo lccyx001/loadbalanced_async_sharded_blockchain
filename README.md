@@ -1,7 +1,24 @@
 # loadbalanced_async_sharded_blockchain
-负载均衡、异步区块链分片系统
+A loadbalanced async sharded blockchain demo.
 
-初始环境搭建
+How to eastablish it?
+
+Dependencys:
+```
 sudo apt install gcc 
 sudo apt-get install -y autoconf automake build-essential libffi-dev libtool pkg-config python3-dev
+apt-get install libgmp3-dev
+```
+
+TODO list:
+
+```
+1. Using DAG 
+2. Blockchain ledger out of memory
+3. Using HoneyBadgerBFT
+4. Using loadbalanc
+
+```
+
+
 
