@@ -1,6 +1,6 @@
 import logging
 
-from utils import Utils
+from .utils import Utils
 from datetime import datetime
 
 class Block(object):

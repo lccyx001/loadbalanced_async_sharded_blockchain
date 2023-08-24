@@ -1,6 +1,6 @@
 import zerorpc
-from blockchain import Blockchain
-from message import Message
+from .blockchain import Blockchain
+from .message import Message
 import logging
 
 class Client(object):

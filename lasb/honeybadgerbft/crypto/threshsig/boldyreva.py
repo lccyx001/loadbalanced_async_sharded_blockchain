@@ -10,7 +10,7 @@ from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, pair
 from base64 import encodestring, decodestring
 from operator import mul
 from functools import reduce
-
+import pickle
 # group = PairingGroup('SS512')
 # group = PairingGroup('MNT159')
 group = PairingGroup('MNT224')
@@ -68,19 +68,19 @@ class TBLSPublicKey(object):
         self.VK = VK
         self.VKs = VKs
 
-    def __getstate__(self):
-        """ """
-        d = dict(self.__dict__)
-        d['VK'] = serialize(self.VK)
-        d['VKs'] = list(map(serialize, self.VKs))
-        return d
+    # def __getstate__(self):
+    #     """ """
+    #     d = dict(self.__dict__)
+    #     d['VK'] = serialize(self.VK)
+    #     d['VKs'] = list(map(serialize, self.VKs))
+    #     return d
 
-    def __setstate__(self, d):
-        """ """
-        self.__dict__ = d
-        self.VK = deserialize2(self.VK)
-        self.VKs = list(map(deserialize2, self.VKs))
-        print("I'm being depickled")
+    # def __setstate__(self, d):
+    #     """ """
+    #     self.__dict__ = d
+    #     self.VK = deserialize2(self.VK)
+    #     self.VKs = list(map(deserialize2, self.VKs))
+    #     print("I'm being depickled")
 
     def lagrange(self, S, j):
         """ """
@@ -116,6 +116,7 @@ class TBLSPublicKey(object):
     def combine_shares(self, sigs):
         """ """
         # sigs: a mapping from idx -> sig
+        # sig
         S = set(sigs.keys())
         assert S.issubset(range(self.l))
 
@@ -123,7 +124,22 @@ class TBLSPublicKey(object):
                      [sig ** self.lagrange(S, j)
                       for j, sig in sigs.items()], 1)
         return res
+    
+    def serialize(self,):
+        data = {'l':self.l,'k':self.k,"VK":group.serialize(self.VK,compression=True),"VKs":list(map(lambda x:group.serialize(x,compression=True), self.VKs))}
+        data = pickle.dumps(data)
+        return  data
 
+    @staticmethod        
+    def deserialize(data):
+        obj_dict = pickle.loads(data)
+        obj_dict['VK'] = group.deserialize(obj_dict['VK'],compression=True)
+        obj_dict['VKs'] = list(map(lambda x:group.deserialize(x,compression=True), obj_dict['VKs']))
+        return obj_dict
+    
+    @classmethod
+    def from_dict(cls,data_dict):
+        return cls(data_dict['l'],data_dict['k'],data_dict['VK'],data_dict['VKs'])
 
 class TBLSPrivateKey(TBLSPublicKey):
     """ """
@@ -139,6 +155,25 @@ class TBLSPrivateKey(TBLSPublicKey):
         """ """
         return h ** self.SK
 
+    def serialize(self,):
+        data = {'l':self.l,'k':self.k,'i':self.i,
+                "VK":group.serialize(self.VK,compression=True),
+                "VKs":list(map(lambda x:group.serialize(x,compression=True), self.VKs)),
+                "SK":group.serialize(self.SK,compression=True)}
+        data = pickle.dumps(data)
+        return  data
+
+    @staticmethod        
+    def deserialize(data):
+        obj_dict = pickle.loads(data)
+        obj_dict['VK'] = group.deserialize(obj_dict['VK'],compression=True)
+        obj_dict['VKs'] = list(map(lambda x:group.deserialize(x,compression=True), obj_dict['VKs']))
+        obj_dict['SK'] = group.deserialize(obj_dict['SK'],compression=True)
+        return obj_dict
+    
+    @classmethod
+    def from_dict(cls,data_dict):
+        return cls(data_dict['l'],data_dict['k'],data_dict['VK'],data_dict['VKs'],data_dict['SK'],data_dict['i'])
 
 def dealer(players=10, k=5, seed=None):
     """ """

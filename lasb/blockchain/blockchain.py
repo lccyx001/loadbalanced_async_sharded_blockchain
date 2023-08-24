@@ -3,10 +3,10 @@ import logging
 import datetime
 
 from time import sleep
-from block import Block
-from utils import Utils
-from transaction import Transaction
-from message import Message
+from .block import Block
+from .utils import Utils
+from .transaction import Transaction
+from .message import Message
 
 class Blockchain(object):
     block = Block()

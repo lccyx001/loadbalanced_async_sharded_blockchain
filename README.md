@@ -19,6 +19,3 @@ TODO list:
 4. Using loadbalanc
 
 ```
-
-
-

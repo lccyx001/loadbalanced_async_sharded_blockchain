@@ -1,4 +1,4 @@
-from client import Client
+from blockchain.client import Client
 
 if __name__ == "__main__":
     node2 = Client("node2")

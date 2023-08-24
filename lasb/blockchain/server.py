@@ -1,9 +1,9 @@
 import zerorpc
-from blockchain import Blockchain
-from message import Message
+from .blockchain import Blockchain
+from .message import Message
 import logging
 import time
-logging.basicConfig(filename="test.log", level=logging.INFO)
+# logging.basicConfig(filename="test.log", level=logging.INFO)
 logger = logging.getLogger("server")
 
 class Server(object):
@@ -19,7 +19,7 @@ class Server(object):
         self.shared_tx = []
         self.block_chain =Blockchain(self)
 
-    def p2p_connect(self, addresses):
+    def connect_all(self, addresses):
         # Connect to all peers node at the specified address
         for address in addresses:
             print(address==self.address)
@@ -48,7 +48,7 @@ class Server(object):
             logger.error("Invalid Messages",message)
             return (sender,message)
         if message['msg_type'] == "network" and message['flag']==1:
-            self.p2p_connect(message["content"])
+            self.connect_all(message["content"])
 
         if message['msg_type'] == "transaction" and message['flag']==1:
             self.block_chain.receive_txs(message['content'])
@@ -66,6 +66,6 @@ def run_forever(node):
     server = zerorpc.Server(node)
     address = "tcp://{}:{}".format(node.host,node.port)
     server.bind(address)
-    logger.info("starting node server",node.name)
+    logger.info("starting node server :{}".format(node.name))
     server.run()
     

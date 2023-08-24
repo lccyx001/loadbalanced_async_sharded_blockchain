@@ -1,0 +1,23 @@
+commoncoin:
+  pk: pk
+  N: 3
+  f: 1
+  instance_id: sidA
+  server0:
+    id: 0
+    sk: sk0
+    host: 127.0.0.1
+    port: 4000
+    channels: ["tcp://127.0.0.1:4001","tcp://127.0.0.1:4002"]
+  server1:
+    id: 1
+    sk: sk1
+    host: 127.0.0.1
+    port: 4001
+    channels: ["tcp://127.0.0.1:4000","tcp://127.0.0.1:4002"]
+  server2:
+    id: 2
+    sk: sk2
+    host: 127.0.0.1
+    port: 4002
+    channels: ["tcp://127.0.0.1:4000","tcp://127.0.0.1:4001"]
