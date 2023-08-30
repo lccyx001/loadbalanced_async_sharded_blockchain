@@ -5,7 +5,7 @@ from honeybadgerbft.crypto.threshsig.boldyreva import dealer
 # import pickle
 
 if __name__ == "__main__":
-    N , f = 3, 1
+    N , f = 4, 1
     PK, SKs = dealer(N, f+1)  
 
     data =PK.serialize()

@@ -16,3 +16,9 @@ class RedundantMessageError(BroadcastError):
 
 class AbandonedNodeError(HoneybadgerbftError):
     """Raised when a node does not have enough peer to carry on a distirbuted task."""
+
+
+class InvalidArgsError(HoneybadgerbftError):
+    """Raised when binaryagreement receive a invalid input"""
+    
+    
