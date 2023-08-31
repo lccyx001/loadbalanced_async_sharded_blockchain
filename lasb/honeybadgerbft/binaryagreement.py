@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-
+#TODO: test 0 0 1 1 case
 class Binaryagreement(object):
     
     def __init__(self,session_id,local_id,N,f,
@@ -96,7 +96,6 @@ class Binaryagreement(object):
                 logger.error("local_id:{} ,failed because invalid args:{} remote:{}".format(self.local_id,message[2],channel))
 
     def _reset(self,):
-
         self.est_values = defaultdict(lambda: [set(), set()]) 
         self.est_sent = defaultdict(lambda: [False, False]) # est_send= {round:[bin_val,its values is True or False][sent or not ]}
         self.aux_values = defaultdict(lambda: [set(), set()]) # used in second AUX phase

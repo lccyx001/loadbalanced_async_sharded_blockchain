@@ -1,6 +1,8 @@
 # loadbalanced_async_sharded_blockchain
 A loadbalanced async sharded blockchain demo.
 
+Now under developing.
+
 How to eastablish it?
 
 Dependencys:
@@ -16,6 +18,6 @@ TODO list:
 1. Using DAG 
 2. Blockchain ledger out of memory
 3. Using HoneyBadgerBFT
-4. Using loadbalanc
+4. Using loadbalancing
 
 ```

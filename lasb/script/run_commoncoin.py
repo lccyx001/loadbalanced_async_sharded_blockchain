@@ -1,6 +1,6 @@
 
-from honeybadgerbft.commoncoin import CommonCoin
-from honeybadgerbft.crypto.threshsig.boldyreva import dealer,TBLSPublicKey,TBLSPrivateKey
+from commoncoin import CommonCoin
+from crypto.threshsig.boldyreva import dealer,TBLSPublicKey,TBLSPrivateKey
 import yaml
 import argparse
 

@@ -1,2 +1,4 @@
-honeybadgerbft repo
+Honeybadgerbft source repo
 https://github.com/initc3/HoneyBadgerBFT-Python/
+
+But this repo can only work in local environment so we need modify it to make it can run in a p2p environment.
