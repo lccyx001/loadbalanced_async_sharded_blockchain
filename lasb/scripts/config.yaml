@@ -1,0 +1,70 @@
+common:
+  pk: pk
+  N: 4
+  f: 1
+
+instance0:
+  sk: sk0
+  # We need N common coin instances
+  cc:
+    host: 127.0.0.1
+    port: 2000
+    broadcast_channels: [[1,"tcp://127.0.0.1:3000"],[2,"tcp://127.0.0.1:4000"],[3,"tcp://127.0.0.1:5000"]]
+  rbc:
+    host: 127.0.0.1
+    port: 2001
+    broadcast_channels: [[1,"tcp://127.0.0.1:3001"],[2,"tcp://127.0.0.1:4001"],[3,"tcp://127.0.0.1:5001"]]
+  ba:
+    host: 127.0.0.1
+    port: 2002
+    broadcast_channels: [[1,"tcp://127.0.0.1:3002"],[2,"tcp://127.0.0.1:4002"],[3,"tcp://127.0.0.1:5002"]]
+  honeybadger:
+instance1:
+  sk: sk1
+  # We need N common coin instances
+  cc:
+    host: 127.0.0.1
+    port: 3000
+    broadcast_channels: [[0,"tcp://127.0.0.1:2000"],[2,"tcp://127.0.0.1:4000"],[3,"tcp://127.0.0.1:5000"]]
+  rbc:
+    host: 127.0.0.1
+    port: 3001
+    broadcast_channels: [[0,"tcp://127.0.0.1:2001"],[2,"tcp://127.0.0.1:4001"],[3,"tcp://127.0.0.1:5001"]]  
+  ba:
+    host: 127.0.0.1
+    port: 3002
+    broadcast_channels: [[0,"tcp://127.0.0.1:2002"],[2,"tcp://127.0.0.1:4002"],[3,"tcp://127.0.0.1:5002"]]
+  honeybadger:
+instance2:
+  sk: sk2
+  # We need N common coin instances
+  cc:
+    host: 127.0.0.1
+    port: 4000
+    broadcast_channels: [[1,"tcp://127.0.0.1:3000"],[0,"tcp://127.0.0.1:2000"],[3,"tcp://127.0.0.1:5000"]]
+  rbc:
+    host: 127.0.0.1
+    port: 4001
+    broadcast_channels: [[1,"tcp://127.0.0.1:3001"],[0,"tcp://127.0.0.1:2001"],[3,"tcp://127.0.0.1:5001"]]
+  ba:
+    host: 127.0.0.1
+    port: 4002
+    broadcast_channels: [[1,"tcp://127.0.0.1:3002"],[0,"tcp://127.0.0.1:2002"],[3,"tcp://127.0.0.1:5002"]]
+  honeybadger:
+instance3:
+  sk: sk3
+  # We need N common coin instances
+  cc:
+    host: 127.0.0.1
+    port: 5000
+    broadcast_channels: [[1,"tcp://127.0.0.1:3000"],[2,"tcp://127.0.0.1:4000"],[0,"tcp://127.0.0.1:2000"]]
+  rbc:
+    host: 127.0.0.1
+    port: 5001
+    broadcast_channels: [[1,"tcp://127.0.0.1:3001"],[2,"tcp://127.0.0.1:4001"],[0,"tcp://127.0.0.1:2001"]]
+  ba:
+    host: 127.0.0.1
+    port: 5002
+    broadcast_channels: [[1,"tcp://127.0.0.1:3002"],[2,"tcp://127.0.0.1:4002"],[0,"tcp://127.0.0.1:2002"]]
+  honeybadger:
+

@@ -1,6 +1,9 @@
 import hashlib
 import zfec
 import math
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO,filename="log.log")
 
 def hash(x):
     assert isinstance(x, (str, bytes))
@@ -119,6 +122,6 @@ def merkleVerify(N, val, roothash, branch, index):
         tmp = hash((tindex & 1) and br + tmp or tmp + br)
         tindex >>= 1
     if tmp != roothash:
-        print("Verification failed with", hash(val), roothash, branch, tmp == roothash)
+        logger.error("Verification failed with {} {} {} {}".format(hash(val),roothash,branch,  tmp == roothash))
         return False
     return True
