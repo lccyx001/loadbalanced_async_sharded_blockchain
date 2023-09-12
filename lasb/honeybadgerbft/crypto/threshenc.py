@@ -8,6 +8,7 @@ import pickle
 
 
 from Crypto.Hash import SHA256
+
 from Crypto import Random
 from Crypto.Cipher import AES
 
@@ -87,6 +88,22 @@ class TPKEPublicKey(object):
         self.VK = VK
         self.VKs = VKs
 
+    def serialize(self,):
+        data = {'l':self.l,'k':self.k,"VK":group.serialize(self.VK,compression=True),"VKs":list(map(lambda x:group.serialize(x,compression=True), self.VKs))}
+        data = pickle.dumps(data)
+        return  data
+    
+    @staticmethod        
+    def deserialize(data):
+        obj_dict = pickle.loads(data)
+        obj_dict['VK'] = group.deserialize(obj_dict['VK'],compression=True)
+        obj_dict['VKs'] = list(map(lambda x:group.deserialize(x,compression=True), obj_dict['VKs']))
+        return obj_dict
+    
+    @classmethod
+    def from_dict(cls,data_dict):
+        return cls(data_dict['l'],data_dict['k'],data_dict['VK'],data_dict['VKs'])
+
     def lagrange(self, S, j):
         """ """
         # Assert S is a subset of range(0,self.l)
@@ -105,17 +122,12 @@ class TPKEPublicKey(object):
         """ """
         # Only encrypt 32 byte strings
         assert len(m) == 32
-        # print '1'
         r = group.random(ZR)
-        # print '2'
         U = g1 ** r
-        # print '3'
         # V = xor(m, hashG(pair(g1, self.VK ** r)))
         # V = xor(m, hashG(pair(g1, self.VK ** r)))
         V = xor(m, hashG(self.VK ** r))
-        # print '4'
         W = hashH(U, V) ** r
-        # print '5'
         C = (U, V, W)
         return C
 
@@ -165,13 +177,29 @@ class TPKEPrivateKey(TPKEPublicKey):
         """ """
         # ASSUMPTION
         assert self.verify_ciphertext(U, V, W)
-
-        # print U, V, W
-        # print U
-        # print self.SK
         U_i = U ** self.SK
-
+        
         return U_i
+    
+    def serialize(self,):
+        data = {'l':self.l,'k':self.k,'i':self.i,
+                "VK":group.serialize(self.VK,compression=True),
+                "VKs":list(map(lambda x:group.serialize(x,compression=True), self.VKs)),
+                "SK":group.serialize(self.SK,compression=True)}
+        data = pickle.dumps(data)
+        return  data
+
+    @staticmethod        
+    def deserialize(data):
+        obj_dict = pickle.loads(data)
+        obj_dict['VK'] = group.deserialize(obj_dict['VK'],compression=True)
+        obj_dict['VKs'] = list(map(lambda x:group.deserialize(x,compression=True), obj_dict['VKs']))
+        obj_dict['SK'] = group.deserialize(obj_dict['SK'],compression=True)
+        return obj_dict
+    
+    @classmethod
+    def from_dict(cls,data_dict):
+        return cls(data_dict['l'],data_dict['k'],data_dict['VK'],data_dict['VKs'],data_dict['SK'],data_dict['i'])
 
 
 def dealer(players=10, k=5):
@@ -234,7 +262,7 @@ def encrypt(key, raw):
     raw = pad(raw)
     iv = Random.new().read(AES.block_size)
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    return (iv + cipher.encrypt(raw))
+    return (iv + cipher.encrypt(raw.encode()))
 
 
 def decrypt(key, enc):

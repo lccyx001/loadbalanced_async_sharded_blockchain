@@ -32,12 +32,8 @@ def run(clients):
         pk = cfg.PK
         sk = cfg.SK
         j = 0
-        cc = commoncoin(sid,pid,N,f,pk,sk,clients[i].broadcast_cc,clients[i].receive_cc,j)
-        ba = gevent.spawn_later(i,binaryagreement,sid,pid,N,f,cc,
-                                clients[i].input_ba,
-                                clients[i].output_ba,
-                                clients[i].broadcast_ba,
-                                clients[i].receive_ba,j)
+        cc = commoncoin(sid,pid,N,f,pk,sk,clients[i],j)
+        ba = gevent.spawn_later(i,binaryagreement,sid,pid,N,f,cc,clients[i],j)
         bas.append(ba)
     return bas
 

@@ -1,10 +1,8 @@
-import zerorpc
 import logging
 from collections import defaultdict
 from exceptions import RedundantMessageError, AbandonedNodeError,InvalidArgsError
 import gevent
 from gevent.event import Event
-from gevent.queue import Queue
 from rpcbase import RPCBase
 from commoncoin import commoncoin
 
@@ -12,24 +10,14 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-#TODO: test 0 0 1 1 case
-def binaryagreement(sid,pid,N,f,
-                 coin:commoncoin,
-                 input:RPCBase.input_ba,
-                 output:RPCBase.output_ba,
-                 broadcast:RPCBase.broadcast_ba,
-                 receive:RPCBase.receive_ba,
-                 j):
+def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:RPCBase,j):
     """
     :param sid: session identifier
     :param pid: my id number
     :param N: the number of parties
     :param f: the number of byzantine parties
     :param coin:CommonCoin.get_coin
-    :param input: RPCBase.input_ba
-    :param decide: RPCBase.broadcast
-    :param broadcast: RPCBase.broadcast
-    :param receive: RPCBase.receive_ba
+    :param rpcbase: RPCBase
     :param j: RPCBase query index
 
     :return: blocks until
@@ -55,14 +43,11 @@ def binaryagreement(sid,pid,N,f,
                     # FIXME: raise or continue? For now will raise just
                     # because it appeared first, but maybe the protocol simply
                     # needs to continue.
-                    # print(f'Redundant EST received by {sender}', msg)
-                    # logger.warn(
-                    #     f'Redundant EST message received by {sender}: {msg}',
-                    #     extra={'nodeid': pid, 'epoch': msg[1]}
-                    # )
+                    
+                    logger.warn("{} redundant EST received {}".format(pid,msg))
                     raise RedundantMessageError(
                         'Redundant EST received {}'.format(msg))
-                    
+                    # return
 
                 est_values[round][est_value].add(sender)
                 logger.info("{} Round:{} receive EST message:{} sender:{}".format(pid,round,est_value,sender))
@@ -89,9 +74,10 @@ def binaryagreement(sid,pid,N,f,
                     # FIXME: raise or continue? For now will raise just
                     # because it appeared first, but maybe the protocol simply
                     # needs to continue.
-                    # print('Redundant AUX received', msg)
                     raise RedundantMessageError(
                         'Redundant AUX received {}'.format(msg))
+                    # logger.warn("{} Redundant AUX received {}".format(pid,msg))
+                    # return
 
                 aux_values[round][est_value].add(sender)
                 bv_signal.set()
@@ -105,6 +91,11 @@ def binaryagreement(sid,pid,N,f,
                     bv_signal=bv_signal,
                 )
 
+    input = rpcbase.input_ba
+    output = rpcbase.output_ba
+    broadcast = rpcbase.broadcast_ba
+    receive = rpcbase.receive_ba
+    
     # Messages received are routed to either a shared coin, the broadcast, or AUX
     # used in first EST phase
     est_values = defaultdict(lambda: [set(), set()]) 
@@ -150,15 +141,15 @@ def binaryagreement(sid,pid,N,f,
             # Block until at least N-f AUX values are received
             if 1 in bin_values[r] and len(aux_values[r][1]) >= N - f:
                 values = set((1,))
-                # print('[sid:%s] [pid:%d] VALUES 1 %d' % (sid, pid, r))
+                
                 break
             if 0 in bin_values[r] and len(aux_values[r][0]) >= N - f:
                 values = set((0,))
-                # print('[sid:%s] [pid:%d] VALUES 0 %d' % (sid, pid, r))
+                
                 break
             if sum(len(aux_values[r][v]) for v in bin_values[r]) >= N - f:
                 values = set((0, 1))
-                # print('[sid:%s] [pid:%d] VALUES BOTH %d' % (sid, pid, r))
+                
                 break
             bv_signal.clear()
             bv_signal.wait()
@@ -183,6 +174,7 @@ def binaryagreement(sid,pid,N,f,
 
         try:
             est, already_decided = _set_new_estimate(values,s,already_decided,output,j)
+            logger.info("{} finish ba phase!".format(pid))
         except AbandonedNodeError:
             logger.warn("Quit! AbandonedNodeError")
             _thread_recv.kill()
@@ -222,6 +214,8 @@ def _handle_conf_messages(sender, message, conf_values, pid, bv_signal):
         # https://github.com/initc3/HoneyBadgerBFT-Python/issues/10
         raise RedundantMessageError(
             'Redundant CONF received {}'.format(message))
+        # logger.warn("{} Redundant CONF received {}".format(pid,message))
+        # return
 
     conf_values[r][v].add(sender)
     bv_signal.set()

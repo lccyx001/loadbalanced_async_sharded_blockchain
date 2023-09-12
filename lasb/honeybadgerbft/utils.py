@@ -2,6 +2,8 @@ import hashlib
 import zfec
 import math
 import logging
+from crypto import threshenc as tpke
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
@@ -125,3 +127,23 @@ def merkleVerify(N, val, roothash, branch, index):
         logger.error("Verification failed with {} {} {} {}".format(hash(val),roothash,branch,  tmp == roothash))
         return False
     return True
+
+def serialize_UVW(U, V, W):
+    # U: element of g1 (65 byte serialized for SS512)
+    U = tpke.serialize(U)
+    assert len(U) == 65
+    # V: 32 byte str
+    assert len(V) == 32
+    # W: element of g2 (32 byte serialized for SS512)
+    W = tpke.serialize(W)
+    assert len(W) == 65
+    return U, V, W
+
+
+def deserialize_UVW(U, V, W):
+    assert len(U) == 65
+    assert len(V) == 32
+    assert len(W) == 65
+    U = tpke.deserialize1(U)
+    W = tpke.deserialize2(W)
+    return U, V, W

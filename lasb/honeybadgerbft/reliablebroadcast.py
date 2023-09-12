@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-def reliablebroadcast(sid, pid, N, f, leader, input:RPCBase.input_rbc, receive:RPCBase.receive_rbc, send:RPCBase.send_rbc,broadcast:RPCBase.broadcast_rbc,rbc_in:RPCBase.rbc_in,j):
+def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:RPCBase,j):
     """Reliable broadcast
 
     :param int pid: ``0 <= pid < N``
@@ -44,6 +44,12 @@ def reliablebroadcast(sid, pid, N, f, leader, input:RPCBase.input_rbc, receive:R
         assert _roothash == roothash
         return m
     
+    # input = rpcbase.input_rbc if pid == j else None
+    receive = rpcbase.receive_rbc
+    send = rpcbase.send_rbc
+    broadcast = rpcbase.broadcast_rbc
+    rbc_in = rpcbase.rbc_in
+
     assert N >= 3*f + 1
     assert f >= 0
     assert 0 <= leader < N

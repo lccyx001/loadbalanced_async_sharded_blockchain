@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG,filename="log.log")
 logger = logging.getLogger(__name__)
 
 
-def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,broadcast:RPCBase.broadcast_cc,receive:RPCBase.receive_cc,j):
+def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,rpcbase:RPCBase,j):
     """A shared coin based on threshold signatures
 
     :param sid: a unique instance id
@@ -20,8 +20,7 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,b
     :param f: fault tolerance, :math:`f+1` shares needed to get the coin
     :param PK: ``boldyreva.TBLSPublicKey``
     :param SK: ``boldyreva.TBLSPrivateKey``
-    :param broadcast: RPCBase client broadcast
-    :param receive: RPCBase client get
+    :param rpcbase: RPCBase client 
     :param j: RPCBase query index
     :return: a function ``getCoin()``, where ``getCoin(r)`` blocks
     """
@@ -84,6 +83,9 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,b
                 output_queue[round].put_nowait(bit)
                 logger.info("{} output coin: {}".format(pid,bit))
     
+    broadcast = rpcbase.broadcast_cc
+    receive = rpcbase.receive_cc
+    
     assert _validate_keys()
     received = defaultdict(dict)
     output_queue = defaultdict(lambda:Queue(1))
@@ -95,7 +97,9 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,b
         h =  public_key.hash_message(str(( sid, round)))
         message = ("COIN",round,group.serialize( private_key.sign(h),compression=True))
         broadcast(( j,message))
-        return output_queue[round].get()
+        result = output_queue[round].get()
+        logger.info("{} finish cc phase.".format(pid))
+        return result
     
     return get_coin
     

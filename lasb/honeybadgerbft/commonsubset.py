@@ -1,11 +1,10 @@
 import gevent
 import logging
-from rpcbase import RPCBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
-def commonsubset(pid, N, f, rbc_out:RPCBase.rbc_out, aba_in:RPCBase.aba_in, aba_out:RPCBase.aba_out):
+def commonsubset(pid, N, f, rbc_out, aba_in, aba_out):
     """The BKR93 algorithm for asynchronous common subset.
 
     :param pid: my identifier
@@ -64,5 +63,5 @@ def commonsubset(pid, N, f, rbc_out:RPCBase.rbc_out, aba_in:RPCBase.aba_in, aba_
         else:
             r_threads[j].kill()
             rbc_values[j] = None
-
+    logger.info("{} finish rbc phase".format(pid))
     return tuple(rbc_values)

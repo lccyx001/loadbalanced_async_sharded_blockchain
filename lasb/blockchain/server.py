@@ -4,7 +4,7 @@ from .message import Message
 import logging
 import time
 # logging.basicConfig(filename="test.log", level=logging.INFO)
-logger = logging.getLogger("server")
+logger = logging.getLogger(__name__)
 
 class Server(object):
 
@@ -22,7 +22,6 @@ class Server(object):
     def connect_all(self, addresses):
         # Connect to all peers node at the specified address
         for address in addresses:
-            print(address==self.address)
             if address == self.address:
                 continue
             if address in self.connected_address:
@@ -42,7 +41,6 @@ class Server(object):
 
     def receive(self, sender, message):
         # Print the received message
-        print(self.name,"receive from:",sender,"data:",message)
         logger.info(self.name,"receive from:",sender,"data:",message)
         if not Message.validate(message):
             logger.error("Invalid Messages",message)

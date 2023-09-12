@@ -14,6 +14,7 @@ class RPCBase(object):
         self.greenlet = None
         self.host = host
         self.port =port
+        self.N = N
         
         # used in cc
         self.coin_recvs = [Queue() for _ in range(N)]  
@@ -27,6 +28,24 @@ class RPCBase(object):
         self.rbc_recvs = [Queue() for _ in range(N)] # rbc use this queue to exchange message
         self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
         self.rbc_input = Queue() # only rbc leader will call this queue to receive input
+
+        # used for honeybaderblock
+        self.tpke_recv = Queue()
+        self.proposed = Queue(1)
+    
+    def reset(self,):
+        N = self.N
+        self.coin_recvs = [Queue() for _ in range(N)]  
+        self.aba_recvs = [Queue() for _ in range(N)] # ba use this queue to exchange message
+        self.aba_outputs = [Queue(1) for _ in range(N)] # ba output a value when finish and save it in this queue
+        self.aba_inputs = [Queue(1) for _ in range(N)] # ba receive a upper input and save in this queue
+        self.rbc_recvs = [Queue() for _ in range(N)] # rbc use this queue to exchange message
+        self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
+        self.rbc_input = Queue() # only rbc leader will call this queue to receive input
+        self.tpke_recv = Queue()
+        self.proposed = Queue(1)
+        logger.info("{} reset.".format(self.id))
+
 
     def connect_broadcast_channel(self):
         logger.info("connect to:{}".format(self.broadcast_channel))
@@ -48,10 +67,14 @@ class RPCBase(object):
 
     def recv(self,raw_message):
         logger.debug("recv:{}".format(raw_message))
-        (sender,(tag,(j,msg))) = raw_message
+        
+        (sender,(tag,message)) = raw_message
+        if tag != "TPKE":(j,msg) = message
+
         if tag == "ACS_COIN": self.coin_recvs[j].put_nowait((sender,msg))
         if tag == "ACS_ABA": self.aba_recvs[j].put_nowait((sender,msg))
         if tag == "ACS_RBC": self.rbc_recvs[j].put_nowait((sender,msg))
+        if tag == "TPKE": self.tpke_recv.put_nowait((sender,message))
         # rbc_lens = [len(_) for _ in self.rbc_recvs]
         # logger.debug("{} rbc_recvs queue len:{}".format(self.id,rbc_lens))
 
@@ -63,7 +86,7 @@ class RPCBase(object):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast to:{}".format(self.id,target_id))
+            logger.info("{} broadcast cc to:{}".format(self.id,target_id))
             raw_message = (self.id, ('ACS_COIN', message))
             client.recv(raw_message)
      
@@ -82,7 +105,7 @@ class RPCBase(object):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast to:{}".format(self.id,target_id))
+            logger.info("{} broadcast ba {} to:{}".format(self.id,message[1][0],target_id))
             raw_message = (self.id, ('ACS_ABA', message))
             client.recv(raw_message)
         return True
@@ -114,7 +137,7 @@ class RPCBase(object):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast to:{}".format(self.id,target_id))
+            logger.info("{} broadcast rbc {} to:{}".format(self.id,message[1][0],target_id))
             raw_message = (self.id, ('ACS_RBC', message))
             client.recv(raw_message)
         return True
@@ -169,7 +192,31 @@ class RPCBase(object):
         logger.info("{} index:{} aba_out {}".format(self.id,j,result))
         return result
     
-    #### no use ####
-    def input_rbc_insert(self,message):
-        logger.info("{} acs get input {}".format(self.id,message))
+    #### honeybadger block ####
+    def acs_in(self,message):
+        logger.info("{} acs_in {}".format(self.id,message))
         self.rbc_input.put(message)
+
+    def tpke_bcast(self,message):
+        """
+        :param message: an array of serialized shares
+        """
+        for target_id,(adress,client) in self.remote_channels.items():
+            logger.info("{} broadcast tpke shares to:{}".format(self.id,target_id))
+            raw_message = (self.id, ('TPKE', message))
+            client.recv(raw_message)
+        return True
+    
+    def tpke_receive(self,):
+        result = self.tpke_recv.get()
+        logger.info("{} tpke_receive {}".format(self.id,result))
+        return result
+    
+    def propose_in(self,):
+        result = self.proposed.get()
+        logger.debug("{} propose_in {}".format(self.id,result)) 
+        return result
+    
+    def propose_set(self,transactions):
+        logger.info("{} propose_set {}".format(self.id,transactions))
+        self.proposed.put(transactions)

@@ -4,7 +4,9 @@ from .utils import Utils
 from datetime import datetime
 
 class Block(object):
+
     utils = Utils()
+    
     def forge(self,index,previous_hash,transactions,shard=None):
         block = {'index': index,
                  'nonce': 0,

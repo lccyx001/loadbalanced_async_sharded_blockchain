@@ -22,7 +22,7 @@ def run_cc(clients):
         pk = cfg.PK
         sk = cfg.SK
         j = 0
-        coins.append(commoncoin(sid,pid,N,f,pk,sk,clients[i].broadcast_cc,clients[i].receive_cc,j))
+        coins.append(commoncoin(sid,pid,N,f,pk,sk,clients[i],j))
     return coins
 
 def test_commoncoin():
