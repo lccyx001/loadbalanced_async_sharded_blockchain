@@ -5,13 +5,13 @@ import logging
 import zerorpc
 from exceptions import WrongTypeError
 from gevent.event import Event
-from rpcbase import RPCBase
+from clientbase import ClientBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:RPCBase,j):
+def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:ClientBase,j):
     """Reliable broadcast
 
     :param int pid: ``0 <= pid < N``

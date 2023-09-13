@@ -3,7 +3,7 @@ from utils import hash
 from crypto.threshsig.boldyreva import TBLSPublicKey,TBLSPrivateKey,serialize, group
 from collections import defaultdict,deque
 from exceptions import CommonCoinFailureException
-from rpcbase import RPCBase
+from clientbase import ClientBase
 from gevent.queue import Queue
 from gevent import Greenlet
 
@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG,filename="log.log")
 logger = logging.getLogger(__name__)
 
 
-def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,rpcbase:RPCBase,j):
+def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,rpcbase:ClientBase,j):
     """A shared coin based on threshold signatures
 
     :param sid: a unique instance id

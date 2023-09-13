@@ -6,6 +6,7 @@ import logging
 from hashlib import sha256
 
 class Utils(object):
+    
     def compute_hash(self, block):
         json_block = self.dict_to_json(block)
         return sha256(json_block.encode()).hexdigest()

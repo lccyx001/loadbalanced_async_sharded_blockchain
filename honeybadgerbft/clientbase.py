@@ -1,19 +1,14 @@
-import zerorpc
-import gevent
 from gevent.queue import Queue
 import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
+from loadbalanced_async_sharded_blockchain.rpc.rpcbase import RPCBase
 
-class RPCBase(object):
+class ClientBase(RPCBase):
 
     def __init__(self,broadcast_channels,host,port,N,id) -> None:
-        self.broadcast_channel = broadcast_channels
+        super(ClientBase, self).__init__(broadcast_channels, host, port)
         self.id = id
-        self.remote_channels = dict()
-        self.greenlet = None
-        self.host = host
-        self.port =port
         self.N = N
         
         # used in cc
@@ -45,25 +40,6 @@ class RPCBase(object):
         self.tpke_recv = Queue()
         self.proposed = Queue(1)
         logger.info("{} reset.".format(self.id))
-
-
-    def connect_broadcast_channel(self):
-        logger.info("connect to:{}".format(self.broadcast_channel))
-        if not self.remote_channels:
-            for id,adress in self.broadcast_channel:
-                client = zerorpc.Client()
-                client.connect(adress)   
-                self.remote_channels[id] = [adress,client]
-
-    def run_forever(self):
-        server = zerorpc.Server(self)
-        server.bind("tcp://{}:{}".format(self.host,self.port))
-        self.greenlet = gevent.spawn(server.run)
-        logger.info("start server:{}:{}".format(self.host,self.port))
-        self.greenlet.join()
-
-    def stop(self):
-        self.greenlet.kill()
 
     def recv(self,raw_message):
         logger.debug("recv:{}".format(raw_message))

@@ -3,14 +3,14 @@ from collections import defaultdict
 from exceptions import RedundantMessageError, AbandonedNodeError,InvalidArgsError
 import gevent
 from gevent.event import Event
-from rpcbase import RPCBase
 from commoncoin import commoncoin
+from clientbase import ClientBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:RPCBase,j):
+def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
     """
     :param sid: session identifier
     :param pid: my id number

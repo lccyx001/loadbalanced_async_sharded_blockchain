@@ -4,7 +4,8 @@ from binaryagreement import binaryagreement
 from commonsubset import commonsubset
 from reliablebroadcast import reliablebroadcast
 from honeybadger_block import honeybadger_block
-
+from clientbase import ClientBase
+from config import Config
 import gevent
 
 
@@ -32,23 +33,32 @@ class HoneyBadgerBFT(object):
     :param recv: gevent.queue.Queue.get_nowait
     """
 
-    def __init__(self,sid, pid, B, N, f, sPK, sSK, ePK, eSK, rpcbase) -> None:
+    def __init__(self,sid, pid, B,) -> None:
         self.sid = sid
         self.pid = pid
         self.B = B
-        self.N = N
-        self.f = f
-        self.sPK = sPK
-        self.sSK = sSK
-        self.ePK = ePK
-        self.eSK = eSK
+        config = Config(pid)
+
+        self.N = config.N
+        self.f = config.f
+        self.sPK = config.PK
+        self.sSK = config.SK
+        self.ePK = config.ePK
+        self.eSK = config.eSK
+        
+        _port = config.port
+        _channel = config.channels
+        _host = config.host
+        client = ClientBase(_channel,_host,_port,self.N,pid)
+        self._rpc_thread = gevent.spawn(client.run_forever)
+        gevent.spawn(client.connect_broadcast_channel)
+        self._client = client
 
         self.round = 0  # Current block number
         self.transaction_buffer = []
         self._per_round_recv = {}  # Buffer of each round incoming messages
         
         self._recv_thread = None
-        self._client = rpcbase
 
 
     def submit_tx(self,tx):
@@ -57,9 +67,6 @@ class HoneyBadgerBFT(object):
 
     def run(self):
         """Run the HoneyBadgerBFT protocol."""
-
-        # while True:
-            # For each round...
         r = self.round
 
         # Select all the transactions (TODO: actual random selection)
