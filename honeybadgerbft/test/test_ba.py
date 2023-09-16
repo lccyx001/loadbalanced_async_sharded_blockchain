@@ -1,7 +1,7 @@
 import zerorpc
 from binaryagreement import binaryagreement
 from commoncoin import commoncoin
-from config import Config
+from loadbalanced_async_sharded_blockchain.common.config import Config
 import random
 import gevent
 

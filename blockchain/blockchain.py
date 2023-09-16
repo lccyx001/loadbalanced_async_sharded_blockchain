@@ -1,54 +1,114 @@
 import logging
-from block import Block
-from utils import Utils
-from transaction import Transaction
-from message import Message
+from loadbalanced_async_sharded_blockchain.blockchain.block import Block
+from loadbalanced_async_sharded_blockchain.blockchain.utils import Utils
+from loadbalanced_async_sharded_blockchain.blockchain.transaction import Transaction
+from loadbalanced_async_sharded_blockchain.blockchain.transaction_pool import TransactionPool
+from loadbalanced_async_sharded_blockchain.blockchain.ledger import Ledger
+import gevent
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger import HoneyBadgerBFT
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO,filename="log.log")
 
 class Blockchain(object):
     
-    utils = Utils()
-    def __init__(self, server):
-        self.server = server
+    def __init__(self, config):
+        # self.server = None # used for communcation
+        self._config = config
+        self.tx_pool = TransactionPool()
+        self._ledger = Ledger()
+        
         self.local_tx = []
         self.count_tx = 0
         self.local_block = None
-        self.pow_difficulty = 2
+        
+        self.shared_ledger = []
 
     @property
     def last_block(self):
-        if self.server.shared_ledger:
-            return self.server.shared_ledger[-1]
-        return False
+        return self._ledger.last_block()
+    
+    @property
+    def ledger(self):
+        return self._ledger.ledger
 
-    def get_local_block(self):
-        return self.local_block
+    def ready(self):
+        return not self.tx_pool.empty()
 
-    def set_local_block(self, block):
+    def forge_genesis_block(self):
+        # TODO:only call one time
+        genesis_hash = "genesis block hash"
+        genesis_block = Block.forge(0, genesis_hash, [])
+        genesis_block['hash'] = Utils.compute_hash(genesis_block)
+        self._ledger.append(genesis_block)
+        logging.info('Genesis block was created.')
+
+    def forge_block(self):
+        transactions = self.tx_pool.get_batch()
+        self.local_block = Block.forge(self.last_block['index'] + 1, self.last_block['hash'], transactions)
+
+    def submit_tx(self, data):
+        """
+        :param data: {'from_hash': str,'to_hash': str,'amount': int}
+        """
+        data['index'] = self._get_tx_num()
+        tx_raw = Transaction.new(data)
+        try:
+            self.tx_pool.append(tx_raw)
+        except Exception as e:
+            self.count_tx -= 1
+            logger.error(e)
+
+    def receive_txs(self,txs):
+        self.tx_pool.extend(txs)
+
+    def honeybadgerbft(self,):
+        sid = "SID"
+        pid = self._config.id
+        hbbft = HoneyBadgerBFT(sid, pid, Utils.dict_to_json(self.local_block["transactions"]))
+        gl = gevent.spawn(hbbft.run)
+        
+        comfirmed_txjson = gl.get()
+        comfirmed_txs = []
+        for txjson in comfirmed_txjson:
+            txs = Utils.json_to_dict(txjson)
+            comfirmed_txs.extend(txs)
+        self.local_block["transactions"] = comfirmed_txs
+        
+        block = self.local_block
+        logger.info("get hbbft block {}".format(block))
+        computed_hash = Utils.compute_hash(block)
+        self.local_block['hash'] = computed_hash
+        logger.info("finish one round concensus")
+    
+    def add_block(self):
+        self._add_block()
+
+    def receive_block(self,block):
+        if not Block.validate(block):
+            return False
+        
+        if not self._validate_previous_hash(block):
+            return False
+        
         self.local_block = block
+        self._add_block()
+
+    def _add_block(self):
+        block = self.local_block
+        self.ledger.append(block)
+        self.tx_pool.clear_tx(block)
+        self._clear_local_block()
+        logger.info('Block #{} was inserted into the ledger'.format(block['index']))
 
     def _get_tx_num(self):
         self.count_tx += 1
         return self.count_tx
 
-    # Block
-    def forge_genesis_block(self):
-        content = "forge genesis block,content:hello world"
-        genesis_block = self.block.forge(0, content, [])
-        genesis_block['hash'] = self.utils.compute_hash(genesis_block)
-        self.server.shared_ledger.append(genesis_block)
-        logging.info('Blockchain: Block: genesis was created.')
+    def _clear_local_block(self):
+        self.local_block = None
 
-    def forge_block(self):
-        self.local_block = self.block.forge(self.last_block['index'] + 1,
-                                            self.last_block['hash'],
-                                            self.server.shared_tx)
-        
-    def honeybadgerbft(self):
-        block = self.local_block
-        computed_hash = self.utils.compute_hash(block)
-        self.local_block['hash'] = computed_hash
-
-    def validate_previous_hash(self, block_raw):
+    def _validate_previous_hash(self, block_raw):
         last_block = self.last_block
         if not last_block:
             return False
@@ -56,66 +116,3 @@ class Blockchain(object):
             logging.error('Blockchain: Block: #{} previous_hash is not valid!'.format(block_raw['index']))
             return False
         return True
-
-    def request_add_block(self):
-        if not self.local_block:
-            logging.info('Blockchain: Block: No one to sent over network!.')
-            return False
-        if self.server.is_any_node_alive():
-            message = Message()
-            msg = message.create(msg_type="block",flag=1,content=self.local_block)
-            self.server.broadcast(msg)
-        self._add_block()
-
-    def receive_block(self,block):
-        #TODO:check block valid
-        self.local_block = block
-        self._add_block()
-
-
-    def _add_block(self):
-        self.server.shared_ledger.append(self.local_block)
-        logging.info('Blockchain: Block: #{0} was inserted in the ledger'.format(self.local_block['index']))
-        self._clear_shared_tx(self.local_block)
-        self._clear_local_block()
-
-    def _clear_local_block(self):
-        self.local_block = None
-
-    # Transactions
-    def new_tx(self, data):
-        tx = Transaction()
-        data['index'] = self._get_tx_num()
-        tx_raw = tx.new(data)
-        if tx_raw:
-            self.local_tx.append(tx_raw)
-            self._send_tx_to_nodes()
-        else:
-            self.count_tx -= 1
-
-    def receive_txs(self,txs):
-        self.local_tx.extend(txs)
-        self._add_tx()
-        self._clear_local_tx()
-
-    def _send_tx_to_nodes(self):
-        if self.server.is_any_node_alive():
-            message = Message()
-            msg = message.create(msg_type='transaction',flag=1,content=self.local_tx)
-            self.server.broadcast(msg)
-
-        self._add_tx()
-        self._clear_local_tx()
-
-    def _add_tx(self):
-        for tx in self.local_tx:
-            self.server.shared_tx.append(tx)
-            logging.info('Blockchain: inserted tx #{0}'.format(tx['index']))
-
-    def _clear_local_tx(self):
-        self.local_tx = []
-
-    def _clear_shared_tx(self, block):
-        confirmed_txs = [tx['index'] for tx in block['transactions']]
-        logging.info('Blockchain: shared txs cleared')
-        self.server.shared_tx = [tx for tx in self.server.shared_tx if tx['index'] not in confirmed_txs]

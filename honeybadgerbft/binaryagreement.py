@@ -1,10 +1,10 @@
 import logging
 from collections import defaultdict
-from exceptions import RedundantMessageError, AbandonedNodeError,InvalidArgsError
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.exceptions import RedundantMessageError, AbandonedNodeError,InvalidArgsError
 import gevent
 from gevent.event import Event
-from commoncoin import commoncoin
-from clientbase import ClientBase
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.commoncoin import commoncoin
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
@@ -27,7 +27,7 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
         """main loop"""
         while True:
             sender,msg = receive(j)
-            logger.info("{} receive message:{} from node:{} epoch:{}".format(pid,msg,sender,msg[1]))
+            logger.debug("{} receive message:{} from node:{} epoch:{}".format(pid,msg,sender,msg[1]))
 
             if sender not in range(N):
                 logger.error("sender: {} not in N:{}".format(sender,N))
@@ -50,19 +50,19 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
                     # return
 
                 est_values[round][est_value].add(sender)
-                logger.info("{} Round:{} receive EST message:{} sender:{}".format(pid,round,est_value,sender))
+                logger.debug("{} Round:{} receive EST message:{} sender:{}".format(pid,round,est_value,sender))
                 # Relay after reaching first threshold
                 # more than f + 1 BA nodes have received round round's EST message，means this message is free fault crash, just broadcast it.
-                logger.info("{} Round:{}  sender:{} threhold:{}".format(pid,round,sender,len(est_values[round][est_value])))
+                logger.debug("{} Round:{}  sender:{} threhold:{}".format(pid,round,sender,len(est_values[round][est_value])))
                 if len(est_values[round][est_value]) >= f + 1 and not est_sent[round][est_value]:
                     est_sent[round][est_value] = True
                     broadcast((j,('EST', round, est_value)))
-                    logger.info("Round:{} EST Message reached f+1,value is: {}".format(round,est_value))
+                    logger.debug("Round:{} EST Message reached f+1,value is: {}".format(round,est_value))
 
                 # Output after reaching second threshold
                 # more than f + 1 BA nodes have received round round's EST message，means this message is free byzantine crash, just broadcast it.
                 if len(est_values[round][est_value]) >= 2 * f + 1:
-                    logger.info("Round:{} EST Message reached 2f+1,value is:{}".format(round,est_value))
+                    logger.debug("Round:{} EST Message reached 2f+1,value is:{}".format(round,est_value))
                     bin_values[round].add(est_value)
                     bv_signal.set()
 
@@ -117,7 +117,7 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
     r = 0
     already_decided = None
     while True:
-        logger.info('{} Starting with est = {} in epoch {}'.format(pid,est,r))
+        logger.debug('{} Starting with est = {} in epoch {}'.format(pid,est,r))
         
         if not est_sent[r][est]:
             est_sent[r][est] = True
@@ -125,7 +125,7 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
 
         while len(bin_values[r]) == 0:
             # Block until a value is output
-            logger.info("{} waiting for EST phase value".format(pid))
+            logger.debug("{} waiting for EST phase value".format(pid))
             bv_signal.clear()
             bv_signal.wait()
 
@@ -135,7 +135,7 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
         values = None
 
         while True:
-            logger.info("{}:AUX phase round:{} bin_values:{} aux_values:{}".format(pid,r,
+            logger.debug("{}:AUX phase round:{} bin_values:{} aux_values:{}".format(pid,r,
                                                                                     bin_values[r],
                                                                                     aux_values[r]))
             # Block until at least N-f AUX values are received
@@ -155,7 +155,7 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
             bv_signal.wait()
 
         # CONF phase
-        logger.info('{} start CONF phase,block until at least N-f({}) CONF values are received'.format(pid,N-f))
+        logger.debug('{} start CONF phase,block until at least N-f({}) CONF values are received'.format(pid,N-f))
         if not conf_sent[r][tuple(values)]:
             values = _wait_for_conf_values(pid=pid,
                 N=N,
@@ -169,14 +169,14 @@ def binaryagreement(sid,pid,N,f,coin:commoncoin,rpcbase:ClientBase,j):
                 broadcast=broadcast,j=j)
 
         # Block until receiving the common coin value
-        logger.info('Block until receiving the common coin value')
+        logger.debug('Block until receiving the common coin value')
         s = coin(r,j)
 
         try:
             est, already_decided = _set_new_estimate(values,s,already_decided,output,j)
-            logger.info("{} finish ba phase!".format(pid))
+            logger.debug("{} finish ba phase!".format(pid))
         except AbandonedNodeError:
-            logger.warn("Quit! AbandonedNodeError")
+            logger.warn("{}:{} Quit! AbandonedNodeError".format(pid,j))
             _thread_recv.kill()
             return
         r += 1
@@ -225,7 +225,7 @@ def _wait_for_conf_values(pid, N, f, epoch, conf_sent, bin_values,values, conf_v
     broadcast((j, ('CONF', epoch, tuple(bin_values[epoch]))))
 
     while True:
-        logger.info("{} looping CONF phase, conf_values{}".format(pid,conf_values[epoch]))
+        logger.debug("{} looping CONF phase, conf_values{}".format(pid,conf_values[epoch]))
         
         if 1 in bin_values[epoch] and len(conf_values[epoch][(1,)]) >= N - f:
             return set((1,))

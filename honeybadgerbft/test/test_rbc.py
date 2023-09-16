@@ -2,7 +2,7 @@ import zerorpc
 import random
 from reliablebroadcast import reliablebroadcast
 import gevent
-from config import Config
+from loadbalanced_async_sharded_blockchain.common.config import Config
 
 def get_clients():
     clients = []
@@ -21,7 +21,7 @@ def run(rbcclients):
         sid = "sidA"
         input = rbcclients[i].input_rbc if i == leader else None
         j = 0 
-        gl = gevent.spawn(reliablebroadcast,sid, i ,cfg.N,cfg.f,leader,input,rbcclients[i],j)
+        gl = gevent.spawn(reliablebroadcast,sid, i ,cfg.N,cfg.f,leader,rbcclients[i],j)
         gls.append(gl)
     m = b"hello! this is a test message."
     rbcclients[leader].input_rbc_insert(m)

@@ -1,27 +1,18 @@
 from honeybadger import HoneyBadgerBFT
 import gevent
-
+import json
 
 def test_honeybader(N=4):
     greenlets = [None] * N
     badgers = [None] * N
 
+
+
     sid = "SIDA"
     for pid in range(N):
-        badgers[pid] = HoneyBadgerBFT(sid,pid,1)
+        tx = json.dumps(["<[ACS Input {}]>".format(pid) * 4]) 
+        badgers[pid] = HoneyBadgerBFT(sid,pid,tx)
         print("setup badger",pid)
-
-    for pid in range(N):
-        tx = "<[ACS Input {}]>".format(pid)
-        badgers[pid].submit_tx(tx)
-    for pid in range(N):
-        tx = "<[ACS Input {}]>".format(pid+10)
-        badgers[pid].submit_tx(tx)
-    for pid in range(N):
-        tx = "<[ACS Input {}]>".format(pid+20)
-        badgers[pid].submit_tx(tx)
-    print("input tx to badgers")
-
     
     for i in range(N):    
         greenlets[i] = gevent.spawn(badgers[i].run)

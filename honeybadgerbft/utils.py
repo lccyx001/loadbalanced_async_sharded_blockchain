@@ -2,7 +2,7 @@ import hashlib
 import zfec
 import math
 import logging
-from crypto import threshenc as tpke
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto import threshenc as tpke
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")

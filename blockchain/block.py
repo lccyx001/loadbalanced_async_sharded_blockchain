@@ -8,8 +8,14 @@ class Block(object):
                  'nonce': 0,
                  'previous_hash': previous_hash,
                  'timestamp': str(datetime.now()),
-                 'transactions': transactions}
+                 'transactions': transactions,
+                 'hash':None}
         if shard:
             block['shard'] = shard
         return block
+    
+    @staticmethod
+    def validate(block):
+        #TODO:check valid
+        return True
 

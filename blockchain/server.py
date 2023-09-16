@@ -1,69 +1,45 @@
-import zerorpc
-from blockchain import Blockchain
-from message import Message
+from loadbalanced_async_sharded_blockchain.blockchain.blockchain import Blockchain
+from loadbalanced_async_sharded_blockchain.blockchain.message import Message
 import logging
-import time
-# logging.basicConfig(filename="test.log", level=logging.INFO)
+from loadbalanced_async_sharded_blockchain.common.rpcbase import RPCBase
+from loadbalanced_async_sharded_blockchain.blockchain.utils import Utils
+
+logging.basicConfig(filename="log.log", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class Server(object):
+class Server(RPCBase):
 
-    def __init__(self, name,host,port):
-        self.name = name
-        self.host = host
-        self.port = port
-        self.address = "tcp://{}:{}".format(self.host,self.port)
-        self.peers = []
-        self.connected_address = []
-        self.shared_ledger = []
-        self.shared_tx = []
-        self.block_chain =Blockchain(self)
+    def __init__(self,config,blockchain:Blockchain):
+        broadcast_channels = config.channels
+        host = config.host
+        port = config.port
+        self.id = config.id
+        super(Server, self).__init__(broadcast_channels, host, port)
+        self._blockchain = blockchain
 
-    def connect_all(self, addresses):
-        # Connect to all peers node at the specified address
-        for address in addresses:
-            if address == self.address:
-                continue
-            if address in self.connected_address:
-                continue
-            s2s_client =zerorpc.Client()
-            s2s_client.connect(address)
-            self.peers.append(s2s_client)
-            logger.info("connect to :{}".format(address))
-
-    # P2P Server API
     def broadcast(self, message):
-        # Send a message to all connected peers
-        for peer in self.peers:
-            logger.info(self.name,"send message",message)
-            peer.receive(self.name, message)
-
+        if not Message.validate(message):
+            return
+        
+        for target_id,(adress,client) in self.remote_channels.items():
+            logger.info("{} broadcast to:{}".format(self.id,target_id))
+            client.receive(self.id,message)
 
     def receive(self, sender, message):
         # Print the received message
-        logger.info(self.name,"receive from:",sender,"data:",message)
-        if not Message.validate(message):
-            logger.error("Invalid Messages",message)
-            return (sender,message)
-        if message['msg_type'] == "network" and message['flag']==1:
-            self.connect_all(message["content"])
+        logger.info("{} receive message from:{}".format(self.id,sender))
+        msg_type, content, ts = message["msg_type"],message["content"],message["timestamp"]
 
-        if message['msg_type'] == "transaction" and message['flag']==1:
-            self.block_chain.receive_txs(message['content'])
+        if msg_type == "transaction":
+            self._receive_tx(content)
 
-        if message['msg_type'] == "block" and message['flag']==1:
-            self.block_chain.receive_block(message['content'])
+        if msg_type == "block":
+            self._blockchain.receive_block(content)
 
-        return (sender,message)
-    
-    def is_any_node_alive(self):
-        return True
-    
+    def _receive_tx(self,tx_json):
+        tx = Utils.json_to_dict(tx_json)
+        self._blockchain.receive_txs([tx])
 
-def run_forever(node):
-    server = zerorpc.Server(node)
-    address = "tcp://{}:{}".format(node.host,node.port)
-    server.bind(address)
-    logger.info("starting node server :{}".format(node.name))
-    server.run()
-    
+    def _receive_block(self,block_json):
+        block = Utils.json_to_dict(block_json)
+        self._blockchain.receive_block(block)

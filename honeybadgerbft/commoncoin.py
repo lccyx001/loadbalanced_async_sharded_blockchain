@@ -1,9 +1,9 @@
 import logging
-from utils import hash
-from crypto.threshsig.boldyreva import TBLSPublicKey,TBLSPrivateKey,serialize, group
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.utils import hash
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto.threshsig.boldyreva import TBLSPublicKey,TBLSPrivateKey,serialize, group
 from collections import defaultdict,deque
-from exceptions import CommonCoinFailureException
-from clientbase import ClientBase
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.exceptions import CommonCoinFailureException
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 from gevent.queue import Queue
 from gevent import Greenlet
 
@@ -48,7 +48,7 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
     def _recv():
         while True:
             sender, (msg_type,round,sign) = receive(j) 
-            logger.info("{} receive message".format(pid))
+            logger.debug("{} receive message".format(pid))
             if not _message_check(sender,round):
                 continue
             
@@ -64,10 +64,10 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
             
             received[round][sender] = sign
             
-            logger.info("{} collecting shares, {} / {}".format(pid,len(received[round]),f+1))
+            logger.debug("{} collecting shares, {} / {}".format(pid,len(received[round]),f+1))
             if len( received[round]) ==  f+1:
                 
-                logger.info("{}:Got enough shares round:{}".format(pid,round))
+                logger.debug("{}:Got enough shares round:{}".format(pid,round))
                 signs = dict(list(received[round].items())[:f+1])
                 sign =  public_key.combine_shares(signs)
 
@@ -77,11 +77,11 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
                     logger.error("Signature verify failed!{}".format((sid,pid,sender,round)))
                     continue
 
-                logger.info("{} Signature verify success".format(pid))
+                logger.debug("{} Signature verify success".format(pid))
 
                 bit = hash(serialize(sign))[0] % 2
                 output_queue[round].put_nowait(bit)
-                logger.info("{} output coin: {}".format(pid,bit))
+                logger.debug("{} output coin: {}".format(pid,bit))
     
     broadcast = rpcbase.broadcast_cc
     receive = rpcbase.receive_cc
@@ -93,12 +93,12 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
     Greenlet(_recv).start()
 
     def get_coin(round,j):
-        logger.info("{} start round:{}".format(pid,round))
+        logger.debug("{} start round:{}".format(pid,round))
         h =  public_key.hash_message(str(( sid, round)))
         message = ("COIN",round,group.serialize( private_key.sign(h),compression=True))
         broadcast(( j,message))
         result = output_queue[round].get()
-        logger.info("{} finish cc phase.".format(pid))
+        logger.debug("{} finish cc phase. result:{}".format(pid,result))
         return result
     
     return get_coin

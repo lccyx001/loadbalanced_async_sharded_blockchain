@@ -22,17 +22,18 @@ def commonsubset(pid, N, f, rbc_out, aba_in, aba_out):
     def _recv_rbc(j):
         # Receive output from reliable broadcast
         rbc_values[j] = rbc_out(j)
-        logger.info("{} index:{} receive rbc out:{}".format(pid,j,rbc_values[j]))
+        logger.debug("{} receive {}'s rbc out".format(pid,j,))
         if not aba_inputted[j]:
             # Provide 1 as input to the corresponding bin agreement
             aba_inputted[j] = True
-            logger.info("{} aba_in:{}".format(pid,j))
+            logger.debug("{} set {}'s aba_in".format(pid,j))
             aba_in(1,j)
 
     def _recv_aba(j):
         # Receive output from binary agreement
+        logger.debug("{} start aba instance {}".format(pid,j))
         aba_values[j] = aba_out(j)  # May block
-        logger.info("{}: index:{} aba_out value:{}".format(pid,j,aba_values[j]))
+        logger.debug("{} receive {}'s aba_out value:{} ".format(pid,j,aba_values[j]))
 
         if sum(aba_values) >= N - f:
             # Provide 0 to all other aba
@@ -47,9 +48,10 @@ def commonsubset(pid, N, f, rbc_out, aba_in, aba_out):
     rbc_values = [None] * N
 
     r_threads = [gevent.spawn(_recv_rbc, j) for j in range(N)]
+    logger.info("{} rbc init".format(pid))
     # Wait for all binary agreements
     a_threads = [gevent.spawn(_recv_aba, j) for j in range(N)]
-    logger.info("{} acs init threads ".format(pid))
+    logger.info("{} aba init".format(pid))
 
     gevent.joinall(a_threads)
     logger.info("{} finish recv aba threads aba_values:{}".format(pid,aba_values))
@@ -63,5 +65,5 @@ def commonsubset(pid, N, f, rbc_out, aba_in, aba_out):
         else:
             r_threads[j].kill()
             rbc_values[j] = None
-    logger.info("{} finish rbc phase".format(pid))
+    logger.info("{} finish acs phase".format(pid))
     return tuple(rbc_values)

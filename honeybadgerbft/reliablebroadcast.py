@@ -1,17 +1,17 @@
 # coding=utf-8
 from collections import defaultdict
-from utils import ErasureCode,merkleTree,getMerkleBranch,merkleVerify
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.utils import ErasureCode,merkleTree,getMerkleBranch,merkleVerify
 import logging
 import zerorpc
-from exceptions import WrongTypeError
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.exceptions import WrongTypeError
 from gevent.event import Event
-from clientbase import ClientBase
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
 
-def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:ClientBase,j):
+def reliablebroadcast(sid, pid, N, f, leader, rpcbase:ClientBase,j):
     """Reliable broadcast
 
     :param int pid: ``0 <= pid < N``
@@ -44,7 +44,93 @@ def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:ClientBase,j):
         assert _roothash == roothash
         return m
     
-    # input = rpcbase.input_rbc if pid == j else None
+    def _statisfy_echo_condition(echoCounter,roothash,EchoThreshold,readySent):
+        return echoCounter[roothash] >= EchoThreshold and not readySent
+    
+    def _statisfy_output_condition(ready,roothash,OutputThreshold,echoCounter,K):
+        return len(ready[roothash]) >= OutputThreshold and echoCounter[roothash] >= K
+    
+    def _statisfy_ready_condition(ready,roothash,ReadyThreshold,readySent):
+        return len(ready[roothash]) >= ReadyThreshold and not readySent
+    
+    def _handle_VAL_message(sender, message):
+        # Validation
+        logger.debug("{} receive VAL message from:{}".format(pid,sender))
+        (message_type, roothash, branch, stripe, hashidx) = message
+        if sender != leader:
+            logger.warn("{} VAL message from other than leader:{}".format(pid,sender))
+            return
+        try:
+            assert merkleVerify(N, stripe, roothash, branch, hashidx)
+        except Exception as e:
+            logger.error("{} Failed to validate VAL message:{}".format(pid,e))
+            return
+        
+        # Update
+        logger.debug("{} receive {}'s VAL message.".format(pid,sender))
+        broadcast((j,('ECHO', roothash, branch, stripe)) )
+        
+    
+    def _handle_ECHO_message(sender, message,readySent):
+        (message_type, roothash, branch, stripe) = message
+        # Validation
+        if (roothash in stripes and stripes[roothash][sender] is not None) or sender in echoSenders:
+            logger.debug("{} Redundant ECHO".format(pid))
+            return
+        
+        try:
+            assert merkleVerify(N, stripe, roothash, branch, sender)
+        except AssertionError as e:
+            logger.error("{} Failed to validate ECHO message with error:{}".format(pid,e))
+            return
+
+        logger.debug("{} receive ECHO from sender:{} instance:{}".format(pid,sender,j))
+        # Update
+        stripes[roothash][sender] = stripe
+        echoSenders.add(sender)
+        echoCounter[roothash] += 1
+        
+        if _statisfy_echo_condition(echoCounter,roothash,EchoThreshold,readySent):
+            logger.debug("{} broadcast sender:{} instance:{} READY".format(pid,sender,j))
+            readySent = True
+            broadcast((j,('READY', roothash)))
+
+        # Because of network dealy,we may just receive messages when other nodes has already finish READY phase.
+        if _statisfy_output_condition(ready,roothash,OutputThreshold,echoCounter,K):
+            m = _decode_output(roothash)
+            rbc_in(m,j)
+            logger.debug("{}:{} finish RBC and decode output".format(pid,j))
+            return m
+        
+    def _handle_READY_message(sender,message,readySent):
+        (_, roothash) = message
+        
+        # Validation
+        if sender in ready[roothash] or sender in readySenders:
+            logger.warn("{} Redundant READY from {}".format(pid,sender))
+            return
+        
+        logger.debug("{} receive READY from sender:{} instance:{}".format(pid,sender,j))
+        # Update
+        ready[roothash].add(sender)
+        readySenders.add(sender)
+
+        # Amplify ready messages
+        if _statisfy_ready_condition(ready,roothash,ReadyThreshold,readySent):
+            logger.debug("{} broadcast instance:{} READY".format(pid,j))
+            readySent = True
+            #TODO:check if pid is right
+            broadcast((pid, ('READY', roothash)))
+
+        logger.debug("{} ECHO counter threshold:{} received:{} ".format(pid, K, echoCounter[roothash]))
+        if _statisfy_output_condition(ready,roothash,OutputThreshold,echoCounter,K):
+            m = _decode_output(roothash)
+            rbc_in(m,j)
+            logger.debug("{}:{} finish RBC and decode output".format(pid,j))
+            return m
+
+
+    input = rpcbase.input_rbc if pid == leader else None
     receive = rpcbase.receive_rbc
     send = rpcbase.send_rbc
     broadcast = rpcbase.broadcast_rbc
@@ -78,13 +164,13 @@ def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:ClientBase,j):
         roothash = mt[1]
         logger.debug("{} make stripes tree:{}".format(pid,mt))
 
-        logger.info("{} as leader send branch".format(pid))
+        logger.debug("{} as leader send branch".format(pid))
         for i in range(N):
             branch = getMerkleBranch(i, mt)
-            logger.info("{} leader send to {} VAL".format(pid,i))
+            logger.debug("{} leader send to {} VAL".format(pid,i))
             send(i, ('VAL', roothash, branch, stripes[i], i), j)
-            logger.info("{} leader send to {} finish".format(pid,i))
-
+            logger.debug("{} leader send to {} finish".format(pid,i))
+        logger.info("{} finish leader send phase".format(pid))
     # TODO: filter policy: if leader, discard all messages until sending VAL
 
     fromLeader = None
@@ -97,88 +183,20 @@ def reliablebroadcast(sid, pid, N, f, leader,input, rpcbase:ClientBase,j):
 
     while True: # main receive loop
         sender, message = receive(j)   
-        logger.info("{}:{} receive from {} message:{}".format(pid,j,sender,message))
+        
         if message[0] == 'VAL' and fromLeader is None:
-            # Validation
-            logger.info("{} receive VAL message from:{}".format(pid,sender))
-            (message_type, roothash, branch, stripe, hashidx) = message
-            if sender != leader:
-                logger.info("{} VAL message from other than leader:{}".format(pid,sender))
-                continue
-            try:
-                assert merkleVerify(N, stripe, roothash, branch, hashidx)
-            except Exception as e:
-                logger.error("{} Failed to validate VAL message:{}".format(pid,e))
-                continue
-            
-            # Update
-            logger.info("{} make VAL phase broadcast.".format(pid,))
-            broadcast((j,('ECHO', roothash, branch, stripe)) )
+            # validate val message and broadcast ECHO message.
+            _handle_VAL_message(sender=sender,message=message)
 
         # ECHO phase check Merkle branch, if receive from N-f distinct nodes and not send READY message than broadcast READY to other nodes.
         elif message[0] == 'ECHO':
-            (message_type, roothash, branch, stripe) = message
-            # Validation
-            logger.info("{} receive ECHO message from:{}".format(pid,sender))
-            if (roothash in stripes and stripes[roothash][sender] is not None) or sender in echoSenders:
-                logger.info("{} Redundant ECHO".format(pid))
-                continue
+            finsh_ready = _handle_ECHO_message(sender=sender,message=message,readySent=readySent)
+            if finsh_ready:
+                return finsh_ready
             
-            try:
-                assert merkleVerify(N, stripe, roothash, branch, sender)
-            except AssertionError as e:
-                logger.error("{} Failed to validate ECHO message with error:{}".format(pid,e))
-                continue
-
-            logger.info("{} finish check ECHO message".format(pid))
-            
-            # Update
-            stripes[roothash][sender] = stripe
-            echoSenders.add(sender)
-            echoCounter[roothash] += 1
-
-            logger.info("{} ECHO phase update state,from sender:{}  echoSenders:{} echoCounter:{}".format(
-                pid,
-                sender,
-                echoSenders,
-                echoCounter))
-            
-            if echoCounter[roothash] >= EchoThreshold and not readySent:
-                logger.info("{} statisfy echo threshold and not send ready, now broadcast READY in ECHO phase".format(pid))
-                readySent = True
-                broadcast((j,('READY', roothash)))
-
-            # Because of network dealy,we may just receive messages when other nodes has already finish READY phase.
-            if len(ready[roothash]) >= OutputThreshold and echoCounter[roothash] >= K:
-                m = _decode_output(roothash)
-                rbc_in(m,j)
-                logger.info("{} in ECHO phase finish RBC and decode output{}".format(pid,m))
-                return m
-        
         # READY phase
         elif message[0] == 'READY':
-            (_, roothash) = message
-            logger.info("{} receive READY message from:{}".format(pid,sender))
+            finsh_ready = _handle_READY_message(sender=sender,message=message,readySent=readySent)
+            if finsh_ready:
+                return finsh_ready
             
-            # Validation
-            if sender in ready[roothash] or sender in readySenders:
-                logger.info("{} Redundant READY".format(pid))
-                continue
-
-            # Update
-            ready[roothash].add(sender)
-            readySenders.add(sender)
-            logger.info("{} READY threshold:{} received:{} ".format(pid,ReadyThreshold,ready[roothash]))
-
-            # Amplify ready messages
-            if len(ready[roothash]) >= ReadyThreshold and not readySent:
-                logger.info("{} statisfy READY threshold and not send ready, now broadcast READY in READY phase".format(pid,))
-                readySent = True
-                broadcast((pid, ('READY', roothash)))
-
-            logger.info("{} ECHO counter threshold:{} received:{} ".format(pid, K, echoCounter[roothash]))
-            if len(ready[roothash]) >= OutputThreshold and echoCounter[roothash] >= K:
-                m = _decode_output(roothash)
-                rbc_in(m,j)
-                logger.info("{} finish RBC and decode output:{}".format(pid,m))
-                return m

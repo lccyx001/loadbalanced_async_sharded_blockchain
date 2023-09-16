@@ -1,9 +1,10 @@
 import zerorpc
-from binaryagreement import binaryagreement
 from commoncoin import commoncoin
+from binaryagreement import binaryagreement
 from reliablebroadcast import reliablebroadcast
 from commonsubset import commonsubset
-from config import Config
+from honeybadger_block import honeybadger_block
+from loadbalanced_async_sharded_blockchain.common.config import Config
 import gevent
 
 def get_clients():
@@ -14,8 +15,7 @@ def get_clients():
         clients.append(client)
     return clients
 
-def _make_acs(sid,pid,N,f,PK,SK,client):
-    greenlets = []
+def _make_honeybadger(sid,pid,N,f,PK,SK,ePK,eSK,client):
     def _setup(j):
         # setup coin
         cc_sid = sid + 'COIN' + str(j)
@@ -30,43 +30,43 @@ def _make_acs(sid,pid,N,f,PK,SK,client):
 
         # setup rbc
         rbc_sid = sid +  "RBC" + str(j)
-        input = client.input_rbc if j == pid else None 
         # 
-        rbc = gevent.spawn(reliablebroadcast,rbc_sid,pid,N,f,j,input,client,j)
+        rbc = gevent.spawn(reliablebroadcast,rbc_sid,pid,N,f,j,client,j)
         print("setup rbc",pid,j,"input",input)
-        greenlets.extend([ba,rbc])
+    
 
     for j in range(N):
         _setup(j)
+    acs = gevent.spawn(commonsubset,pid,N,f,client.rbc_out,client.aba_in,client.aba_out)
+    return honeybadger_block(pid,N,f,ePK,eSK,acs.get,client)
+        
 
-    return commonsubset(pid,N,f,client.rbc_out,client.aba_in,client.aba_out)
-
-def test_acs(clients,N=4):
-    acs_greenlets = [None] * N
+def test_honeybader(clients,N=4):
+    badgers = [None] * N
     for i in range(N):
         cfg = Config(i)
-        acs_greenlets[i] = gevent.spawn(_make_acs,"SID",cfg.id,cfg.N,cfg.f,cfg.PK,cfg.SK,clients[i])
-        print("setup acs",i)
-    print("setup acs")
-    # return
+        badgers[i] = gevent.spawn(_make_honeybadger,"SID",cfg.id,cfg.N,cfg.f,cfg.PK,cfg.SK,cfg.ePK,cfg.eSK,clients[i])
+        print("setup badgers",i)
 
     for i in range(N):
-        if i ==1:
-            continue
-        msg = "<[ACS Input {}]>".format(i)
+        # if i ==1:
+        #     continue
+        msg = "<[HBBFT Input {}]>".format(i)
         print("input message",msg)
-        clients[i].input_rbc_insert(msg)
-        gevent.sleep(5)
-    print("input message to acs")
-    outs = [acs_greenlets[i].get() for i in range(N)]
-    print("receive message")
+        clients[i].propose_set(msg)
+        # gevent.sleep(5)
+    print("input message to badgers")
+    outs = [badgers[i].get() for i in range(N)]
+    print("receive badgers")
     for o in outs:
         print(o)
     
 
 if __name__ == "__main__":
     clients = get_clients()
-    test_acs(clients,4)
+    test_honeybader(clients,4)
+    # cfg = Config(0)
+    # _make_honeybadger("sida",0,4,1,cfg.PK,cfg.SK,cfg.ePK,cfg.eSK,clients[0])
     # print(clients)
     
     

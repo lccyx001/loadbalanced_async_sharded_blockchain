@@ -1,6 +1,6 @@
 import zerorpc
 from commoncoin import commoncoin
-from config import Config
+from loadbalanced_async_sharded_blockchain.common.config import Config
 import gevent
 
 def get_clients():

@@ -1,5 +1,5 @@
-from crypto import threshenc as tpke
-from utils import serialize_UVW,deserialize_UVW
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto import threshenc as tpke
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.utils import serialize_UVW,deserialize_UVW
 import os
 import pickle
 import logging
@@ -68,7 +68,8 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
             tkey = deserialize_UVW(*tkey)
             key = PK.combine_shares(*tkey, svec)
             plain = tpke.decrypt(key, ciph)
-            decryptions.append(plain)
+            assert isinstance(plain, bytes)
+            decryptions.append(plain.decode())
         return decryptions
         
 
@@ -100,6 +101,6 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
     logger.info("{} Receive shares".format(pid))
     
     decryptions = decrypt(vall,shares_received)
-    logger.info("{} Done! {}".format(pid,decryptions))
+    logger.info("{} honeybadgerBFT Done!".format(pid))
     
     return tuple(decryptions)

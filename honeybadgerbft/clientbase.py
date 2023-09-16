@@ -1,8 +1,9 @@
 from gevent.queue import Queue
 import logging
+from loadbalanced_async_sharded_blockchain.common.rpcbase import RPCBase
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
-from loadbalanced_async_sharded_blockchain.rpc.rpcbase import RPCBase
 
 class ClientBase(RPCBase):
 
@@ -62,7 +63,7 @@ class ClientBase(RPCBase):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast cc to:{}".format(self.id,target_id))
+            logger.debug("{} broadcast cc to:{}".format(self.id,target_id))
             raw_message = (self.id, ('ACS_COIN', message))
             client.recv(raw_message)
      
@@ -81,7 +82,7 @@ class ClientBase(RPCBase):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast ba {} to:{}".format(self.id,message[1][0],target_id))
+            logger.debug("{} broadcast ba {} to:{}".format(self.id,message[1][0],target_id))
             raw_message = (self.id, ('ACS_ABA', message))
             client.recv(raw_message)
         return True
@@ -113,7 +114,7 @@ class ClientBase(RPCBase):
         """
         assert len(message) == 2
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast rbc {} to:{}".format(self.id,message[1][0],target_id))
+            logger.debug("{} broadcast rbc {} to:{}".format(self.id,message[1][0],target_id))
             raw_message = (self.id, ('ACS_RBC', message))
             client.recv(raw_message)
         return True
@@ -156,21 +157,21 @@ class ClientBase(RPCBase):
     #### acs ####
     def rbc_out(self,j):
         result = self.rbc_outputs[j].get()
-        logger.info("{} index:{} rbc_outputs {}".format(self.id,j,result))
+        logger.debug("{} index:{} rbc_outputs {}".format(self.id,j,result))
         return result
 
     def aba_in(self,vi,j):
-        logger.info("{} index:{} aba_in {}".format(self.id,j,vi))
+        logger.debug("{} index:{} aba_in {}".format(self.id,j,vi))
         self.aba_inputs[j].put_nowait(vi)
     
     def aba_out(self,j):
         result = self.aba_outputs[j].get()
-        logger.info("{} index:{} aba_out {}".format(self.id,j,result))
+        logger.debug("{} index:{} aba_out {}".format(self.id,j,result))
         return result
     
     #### honeybadger block ####
     def acs_in(self,message):
-        logger.info("{} acs_in {}".format(self.id,message))
+        logger.debug("{} acs_in {}".format(self.id,message))
         self.rbc_input.put(message)
 
     def tpke_bcast(self,message):
@@ -178,14 +179,14 @@ class ClientBase(RPCBase):
         :param message: an array of serialized shares
         """
         for target_id,(adress,client) in self.remote_channels.items():
-            logger.info("{} broadcast tpke shares to:{}".format(self.id,target_id))
+            logger.debug("{} broadcast tpke shares to:{}".format(self.id,target_id))
             raw_message = (self.id, ('TPKE', message))
             client.recv(raw_message)
         return True
     
     def tpke_receive(self,):
         result = self.tpke_recv.get()
-        logger.info("{} tpke_receive {}".format(self.id,result))
+        logger.debug("{} tpke_receive {}".format(self.id,result))
         return result
     
     def propose_in(self,):
@@ -194,5 +195,5 @@ class ClientBase(RPCBase):
         return result
     
     def propose_set(self,transactions):
-        logger.info("{} propose_set {}".format(self.id,transactions))
+        logger.debug("{} propose_set {}".format(self.id,transactions))
         self.proposed.put(transactions)
