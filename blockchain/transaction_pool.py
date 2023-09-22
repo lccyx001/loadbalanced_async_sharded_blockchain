@@ -30,8 +30,8 @@ class TransactionPool(object):
                  'transactions': list[tx]}
         """
         confirmed_txs = [tx['index'] for tx in block['transactions']]
-        logging.info('Blockchain: shared txs cleared')
         self.local_tx_pool = [tx for tx in self.local_tx_pool if tx['index'] not in confirmed_txs]
+        logger.info('shared txs cleared')
 
     def get_batch(self,batch=20):
         return self.local_tx_pool[:batch]

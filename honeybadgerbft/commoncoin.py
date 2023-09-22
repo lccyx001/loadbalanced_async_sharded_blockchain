@@ -1,11 +1,11 @@
 import logging
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.utils import hash
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto.threshsig.boldyreva import TBLSPublicKey,TBLSPrivateKey,serialize, group
-from collections import defaultdict,deque
+from collections import defaultdict
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.exceptions import CommonCoinFailureException
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 from gevent.queue import Queue
-from gevent import Greenlet
+import gevent
 
 logging.basicConfig(level=logging.DEBUG,filename="log.log")
 logger = logging.getLogger(__name__)
@@ -41,65 +41,60 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
             return False
         
         if sender in received[round]:
-            logger.warn("redundant coin sig received：{}".format(pid))
+            logger.warn("redundant coin sig received：{} round:{} received:{}".format(pid,round,received))
             return False
         return True
     
+    def _meet_share_condition(r,received,f):
+        return len( received[r]) ==  f+1
+    
     def _recv():
         while True:
-            sender, (msg_type,round,sign) = receive(j) 
-            logger.debug("{} receive message".format(pid))
-            if not _message_check(sender,round):
-                continue
+            sender, (_, r, sign_serialized) = receive(j) 
+            assert _message_check(sender,r)
+            assert isinstance(sign_serialized, bytes)
+            logger.debug("{} receive instance{}'s cc message".format(pid,j))
             
-            sign = group.deserialize(sign,compression=True)
-
-            h = public_key.hash_message(str((sid,round)))
-
+            sign = group.deserialize(sign_serialized,compression=True)
+            h = public_key.hash_message(str((sid,r)))
             try:
+                # when current sid != message sid or current r != message r will fail.
                 public_key.verify_share(sign,sender,h)
             except AssertionError:
-                logger.error("{} signature share failed in round {}!".format(pid, round))
+                logger.warn("{} pk verify_share failed in round {}!".format(pid, r))
                 continue
             
-            received[round][sender] = sign
+            received[r][sender] = sign
             
-            logger.debug("{} collecting shares, {} / {}".format(pid,len(received[round]),f+1))
-            if len( received[round]) ==  f+1:
-                
-                logger.debug("{}:Got enough shares round:{}".format(pid,round))
-                signs = dict(list(received[round].items())[:f+1])
-                sign =  public_key.combine_shares(signs)
-
+            logger.debug("{} collecting shares, {} / {}".format(pid,len(received[r]),f+1))
+            if _meet_share_condition(r,received,f):
+                signs = dict(list(received[r].items())[:f+1])
+                combined_sign =  public_key.combine_shares(signs)
                 try:
-                    public_key.verify_signature(sign,h)
+                    public_key.verify_signature(combined_sign,h)
                 except AssertionError:
-                    logger.error("Signature verify failed!{}".format((sid,pid,sender,round)))
+                    logger.error("{} instance:{} pk verify_signature failed in round:{}!".format(pid,j,r))
                     continue
 
-                logger.debug("{} Signature verify success".format(pid))
-
-                bit = hash(serialize(sign))[0] % 2
-                output_queue[round].put_nowait(bit)
-                logger.debug("{} output coin: {}".format(pid,bit))
-    
-    broadcast = rpcbase.broadcast_cc
-    receive = rpcbase.receive_cc
-    
-    assert _validate_keys()
-    received = defaultdict(dict)
-    output_queue = defaultdict(lambda:Queue(1))
-    
-    Greenlet(_recv).start()
+                bit = hash(serialize(combined_sign))[0] % 2
+                output_queue[r].put_nowait(bit)
 
     def get_coin(round,j):
         logger.debug("{} start round:{}".format(pid,round))
         h =  public_key.hash_message(str(( sid, round)))
-        message = ("COIN",round,group.serialize( private_key.sign(h),compression=True))
+        message = ("COIN", round, group.serialize( private_key.sign(h),compression=True))
         broadcast(( j,message))
+
         result = output_queue[round].get()
-        logger.debug("{} finish cc phase. result:{}".format(pid,result))
+        logger.debug("{} finish cc. result:{}".format(pid,result))
         return result
+
+    broadcast = rpcbase.broadcast_cc
+    receive = rpcbase.receive_cc
+    assert _validate_keys()
     
-    return get_coin
+    received = defaultdict(dict)
+    output_queue = defaultdict(lambda:Queue(1))
+    gl = gevent.spawn(_recv)
+    return get_coin, gl
     

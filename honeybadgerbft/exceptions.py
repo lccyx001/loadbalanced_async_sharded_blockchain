@@ -26,7 +26,6 @@ class InvalidArgsError(HoneybadgerbftError):
     """Raised when binaryagreement receive a invalid input"""
 
 
-class WrongTypeError(HoneybadgerbftError):
-    """Raised when RBC receive wrong type input"""
+
     
     

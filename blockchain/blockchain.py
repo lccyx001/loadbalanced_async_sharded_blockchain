@@ -5,15 +5,31 @@ from loadbalanced_async_sharded_blockchain.blockchain.transaction import Transac
 from loadbalanced_async_sharded_blockchain.blockchain.transaction_pool import TransactionPool
 from loadbalanced_async_sharded_blockchain.blockchain.ledger import Ledger
 import gevent
+from gevent.event import Event
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger import HoneyBadgerBFT
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
+class Lock(object):
+
+    def __init__(self) -> None:
+        self._lock = Event()
+        self._lock.clear()
+
+    def lock(self):
+        self._lock.set()
+
+    def in_use(self):
+        return self._lock.ready()
+    
+    def unlock(self):
+        self._lock.clear()
+
 class Blockchain(object):
     
     def __init__(self, config):
-        # self.server = None # used for communcation
         self._config = config
         self.tx_pool = TransactionPool()
         self._ledger = Ledger()
@@ -21,8 +37,23 @@ class Blockchain(object):
         self.local_tx = []
         self.count_tx = 0
         self.local_block = None
-        
+        self._local_block_lock = Lock()
+
         self.shared_ledger = []
+
+        _port = config.honeybadger_port
+        _channel = config.honeybadger_channels
+        _host = config.honeybadger_host
+        client = ClientBase(_channel,_host,_port,config.N,config.id)
+        self._rpc_thread = gevent.spawn(client.run_forever)
+        gevent.spawn(client.connect_broadcast_channel)
+        self._client = client
+        pid = self._config.id
+        self._pid = pid
+        self._sid = "SID"
+        
+
+
 
     @property
     def last_block(self):
@@ -45,7 +76,15 @@ class Blockchain(object):
 
     def forge_block(self):
         transactions = self.tx_pool.get_batch()
-        self.local_block = Block.forge(self.last_block['index'] + 1, self.last_block['hash'], transactions)
+        #TODO: cocurrent logic
+
+        # if self._local_block_lock.in_use():
+        #     return False
+        
+        # self._local_block_lock.lock()
+
+        self._set_local_block(Block.forge(self.last_block['index'] + 1, self.last_block['hash'], transactions))
+        logger.info("{} forge block.".format(self._pid))
 
     def submit_tx(self, data):
         """
@@ -63,12 +102,15 @@ class Blockchain(object):
         self.tx_pool.extend(txs)
 
     def honeybadgerbft(self,):
-        sid = "SID"
-        pid = self._config.id
-        hbbft = HoneyBadgerBFT(sid, pid, Utils.dict_to_json(self.local_block["transactions"]))
-        gl = gevent.spawn(hbbft.run)
+        self._client.reset()
         
+        #TODO:local block may be none
+        hbbft = HoneyBadgerBFT(self._sid, self._pid,self._client)
+        hbbft.submit_txs(Utils.dict_to_json(self.local_block["transactions"]))
+        gl = gevent.spawn(hbbft.run)
         comfirmed_txjson = gl.get()
+        assert comfirmed_txjson is not None
+        
         comfirmed_txs = []
         for txjson in comfirmed_txjson:
             txs = Utils.json_to_dict(txjson)
@@ -76,7 +118,6 @@ class Blockchain(object):
         self.local_block["transactions"] = comfirmed_txs
         
         block = self.local_block
-        logger.info("get hbbft block {}".format(block))
         computed_hash = Utils.compute_hash(block)
         self.local_block['hash'] = computed_hash
         logger.info("finish one round concensus")
@@ -93,6 +134,14 @@ class Blockchain(object):
         
         self.local_block = block
         self._add_block()
+
+    # def _get_local_block(self):
+    #     return self.local_block
+    
+    def _set_local_block(self,block):
+        # if self._local_block_lock.in_use():
+        #     return False
+        self.local_block = block
 
     def _add_block(self):
         block = self.local_block

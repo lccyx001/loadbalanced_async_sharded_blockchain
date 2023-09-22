@@ -4,10 +4,9 @@ from loadbalanced_async_sharded_blockchain.honeybadgerbft.binaryagreement import
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.commonsubset import commonsubset
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.reliablebroadcast import reliablebroadcast
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger_block import honeybadger_block
-from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
 from loadbalanced_async_sharded_blockchain.common.config import Config
 import gevent
-
+import traceback
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
@@ -31,48 +30,51 @@ class HoneyBadgerBFT(object):
     :param send: gevent.queue.Queue.put_nowait
     :param recv: gevent.queue.Queue.get_nowait
     """
-
-    def __init__(self,sid, pid,  transactions) -> None:
+    # TODO:不能连续运行，会出现偶发性错误
+    def __init__(self,sid, pid,client) -> None:
         self.sid = sid
         self.pid = pid
         config = Config(pid)
 
-        self.N = config.N
-        self.f = config.f
-        self.sPK = config.PK
-        self.sSK = config.SK
-        self.ePK = config.ePK
-        self.eSK = config.eSK
+        self._N = config.N
+        self._f = config.f
+        self._sPK = config.PK
+        self._sSK = config.SK
+        self._ePK = config.ePK
+        self._eSK = config.eSK
         
-        _port = config.port
-        _channel = config.channels
-        _host = config.host
-        client = ClientBase(_channel,_host,_port,self.N,pid)
-        self._rpc_thread = gevent.spawn(client.run_forever)
-        gevent.spawn(client.connect_broadcast_channel)
         self._client = client
 
-        self.round = 0  # Current block number
-        self.transaction_buffer = transactions
-        self._per_round_recv = {}  # Buffer of each round incoming messages
-        
+        self._round = 0  # Current block number
+        self._transaction_json_buffer = None
         self._recv_thread = None
+
+    def submit_txs(self,tx_json):
+        """tx_json:transaction strings"""
+        assert isinstance(tx_json,str)
+        self._transaction_json_buffer = tx_json
 
     def run(self):
         """Run the HoneyBadgerBFT protocol."""
-        r = self.round
-        tx_to_send = self.transaction_buffer
-
-        new_tx = self._run_round(r, tx_to_send)
-        logger.info('{} new_tx:{}'.format(self.pid,new_tx))
-
-        self.round += 1     # Increment the round
-        self._client.reset()
-        logger.info("{} rpc reset".format(self.pid))
+        r = self._round
+        tx_to_send = self._transaction_json_buffer
+        try:
+            all_gls = []
+            new_tx = self._run_round(r, tx_to_send,all_gls)
+        except Exception as e:
+            traceback.print_exc()
+            logger.error(e)
+            self._transaction_json_buffer = None
+            if not all_gls:
+                gevent.killall(all_gls)
+            return None
+        
+        self._round += 1     # Increment the round
+        self._transaction_json_buffer = None
         return new_tx
 
     
-    def _run_round(self, r, tx_to_send):
+    def _run_round(self, r, tx_to_send,all_gls):
         """Run one protocol round.
 
         :param int r: round id
@@ -84,31 +86,36 @@ class HoneyBadgerBFT(object):
             :param int j: Node index for which the setup is being done.
             """
             cc_sid = sid + 'COIN' + str(j)
-            coin = commoncoin(cc_sid, pid, N, f,self.sPK, self.sSK,self._client,j)
+            coin,coin_gl = commoncoin(cc_sid, pid, N, f,self._sPK, self._sSK,self._client,j)
             logger.debug("init {} commoncoin instance".format(j))
 
             aba_sid = sid+'ABA'+str(j)
-            gevent.spawn(binaryagreement, aba_sid, pid, N, f, coin,self._client,j)
+            ba_gl = gevent.spawn(binaryagreement, aba_sid, pid, N, f, coin,self._client,j)
             logger.debug("init {} binaryagreement instance".format(j))
 
             # Only leader gets input
             rbc_sid = sid+'RBC'+str(j)
-            gevent.spawn(reliablebroadcast, rbc_sid , pid, N, f, j, self._client,j)
+            rbc_gl = gevent.spawn(reliablebroadcast, rbc_sid , pid, N, f, j, self._client,j)
             logger.debug("init {} reliablebroadcast instance".format(j))
+            rbc_out.append(rbc_gl.get)
+            all_gls.extend([coin_gl,ba_gl,rbc_gl])
 
         # Unique sid for each round
         sid = self.sid + ':' + str(r)
         pid = self.pid
-        N = self.N
-        f = self.f
-
+        N = self._N
+        f = self._f
+        rbc_out = []
+        
         # N instances of ABA, RBC
         for j in range(N):
             _setup(j)
             
         # One instance of ACS
-        acs = gevent.spawn(commonsubset, pid, N, f, self._client.rbc_out,self._client.aba_in,self._client.aba_out)
+        acs = gevent.spawn(commonsubset, pid, N, f,rbc_out, self._client)
+        all_gls.append(acs)
         logger.info("{} round {} setup finish".format(pid,r))
 
         self._client.propose_set(tx_to_send)
-        return honeybadger_block(pid, self.N, self.f, self.ePK, self.eSK,acs_out=acs.get,rpcbase= self._client)
+
+        return honeybadger_block(pid, self._N, self._f, self._ePK, self._eSK,acs_out=acs.get,rpcbase= self._client)

@@ -55,7 +55,7 @@ class InstanceConfig(object):
         with open("config.yaml",'r') as yf:
             stream = yf.read()
         config = yaml.load(stream,yaml.SafeLoader)
-        return config.get("honeybadger{}".format(self._id))
+        return config.get("node{}".format(self._id))
     
     @property
     def SK(self):
@@ -81,10 +81,9 @@ class InstanceConfig(object):
     def config(self,):
         return self._config
 
-class BlockchainConfig(object):
-
-    def __init__(self) -> None:
-        pass
+    @property
+    def honeybadger(self):
+        return self._config["honeybadger"]
 
 class Config(object):
 
@@ -133,4 +132,15 @@ class Config(object):
     @property
     def channels(self):
         return self._instance_config.config["channels"]
-
+    
+    @property
+    def honeybadger_port(self):
+        return self._instance_config.honeybadger["port"]
+    
+    @property
+    def honeybadger_host(self):
+        return self._instance_config.honeybadger["host"]
+    
+    @property
+    def honeybadger_channels(self):
+        return self._instance_config.honeybadger["channels"]

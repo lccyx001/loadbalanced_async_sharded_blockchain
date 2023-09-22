@@ -1,10 +1,13 @@
 import time
-from blockchain import Blockchain
-from server import Server
-from message import Message
-from common.config import Config
+from loadbalanced_async_sharded_blockchain.blockchain.blockchain import Blockchain
+from loadbalanced_async_sharded_blockchain.blockchain.server import Server
+from loadbalanced_async_sharded_blockchain.blockchain.message import Message
+from loadbalanced_async_sharded_blockchain.common.config import Config
 import logging
 import gevent
+import traceback
+
+logger = logging.getLogger(__name__)
 
 class Node(object):
 
@@ -13,7 +16,7 @@ class Node(object):
         
         config = Config(id)
         block_chain =Blockchain(config)
-        server = Server(id,config.host,config.port,config.channels,block_chain)
+        server = Server(config,block_chain)
 
         self.server_let = gevent.spawn(server.run_forever)
         server.connect_broadcast_channel()
@@ -36,8 +39,7 @@ class Node(object):
         return self.block_chain.ledger
 
     def get_ledger_size(self):
-        return len(self.block_chain.ledger)
-    
+        return len(self.get_ledger())
 
     def forge_genesis_block(self):
         return self.block_chain.forge_genesis_block()
@@ -45,13 +47,22 @@ class Node(object):
     def mine(self):
         while True:
 
-            if self.block_chain.ready():
+            if not self.block_chain.ready():
+                return
+                logger.info("not ready,now sleep")
                 time.sleep(3)
+                break  # for test
                 continue
-
-            self.block_chain.forge_block()
-            self.block_chain.honeybadgerbft()
-            self.block_chain.add_block()
-            message = Message.create("block",self.block_chain.last_block)
-            self.server.broadcast(message)
             
+            self.block_chain.forge_block()
+            try:
+                self.block_chain.honeybadgerbft()
+            except Exception as e:
+                traceback.print_exc()
+                logger.error(e)
+                continue
+            self.block_chain.add_block()
+            logger.info("{}:mined one block.".format(self.id))
+
+    def ping_pong(self):
+        pass

@@ -1,28 +1,31 @@
-import zerorpc
-from binaryagreement import binaryagreement
-from commoncoin import commoncoin
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.binaryagreement import binaryagreement
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.commoncoin import commoncoin
 from loadbalanced_async_sharded_blockchain.common.config import Config
 import random
 import gevent
 
-def get_clients():
+def _get_clients():
     clients = []
     for i in range(4):
-        client = zerorpc.Client()
-        client.connect("tcp://127.0.0.1:{}000".format(i+2))
+        config = Config(i)
+        client = ClientBase(config.honeybadger_channels,config.honeybadger_host,config.honeybadger_port,config.N,config.id)
+        gevent.spawn(client.run_forever)
+        gevent.spawn(client.connect_broadcast_channel)
         clients.append(client)
     return clients
 
-def dummy_ba_input(clients):
-    j =0 
+def _dummy_ba_input(clients,vi,special=False):
+    j = 0 
     for i, client in enumerate(clients) :
-        vi = random.randint(0,1)
-        # vi = i % 2
-        client.insert_input(vi,j)
-        print("insert",vi)
+        # vi = random.randint(0,1)
+        if special:
+            vi = i % 2
+        client.aba_in(vi,j)
+        
 
-def run(clients):
-    bas = []
+def _make_bas(clients):
+    bagls = []
     for i in range(4):
         cfg = Config(i)
         sid = "sidA" 
@@ -33,26 +36,38 @@ def run(clients):
         sk = cfg.SK
         j = 0
         cc = commoncoin(sid,pid,N,f,pk,sk,clients[i],j)
-        ba = gevent.spawn_later(i,binaryagreement,sid,pid,N,f,cc,clients[i],j)
-        bas.append(ba)
-    return bas
-
-def get_aba_values(clients):
-    result = []
-    j=0
-    for client in clients:
-        r = client.get_decide(j)
-        result.append(r)
-    assert len(result) == 4
-    assert result[0]==result[1]==result[2]==result[3]
-    print(result)
+        ba = gevent.spawn(binaryagreement,sid,pid,N,f,cc,clients[i],j)
+        bagls.append(ba)
+    return bagls
 
 def test_ba():
-    clients = get_clients()
-    bas = run(clients)
-    dummy_ba_input(clients)
+    clients = _get_clients()
+    j = 0
+
+    vi = 0
+    bas = _make_bas(clients)
+    _dummy_ba_input(clients,vi)
     gevent.joinall(bas)
-    get_aba_values(clients)
+    result = [_.aba_out(j) for _ in clients]
+    assert result[0] == result[1] == result[2] == result[3] == 0
+
+    for cli in clients:
+        cli.reset()
+    vi = 1
+    bas = _make_bas(clients)
+    _dummy_ba_input(clients,vi)
+    gevent.joinall(bas)
+    result = [_.aba_out(j) for _ in clients]
+    assert result[0] == result[1] == result[2] == result[3] == 1
+
+    for cli in clients:
+        cli.reset()
+    bas = _make_bas(clients)
+    _dummy_ba_input(clients,vi,special=True)
+    gevent.joinall(bas)
+    result = [_.aba_out(j) for _ in clients]
+    assert result[0] == result[1] == result[2] == result[3]
+    
 
 if __name__ == "__main__":
     test_ba()

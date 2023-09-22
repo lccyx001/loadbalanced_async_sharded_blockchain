@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
-def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
+def honeybadger_block(pid, N, f, ePK, eSK, acs_out,rpcbase):
     """The HoneyBadgerBFT algorithm for a single block
 
     :param pid: my identifier
@@ -15,7 +15,7 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
     :param f: fault tolerance
     :param PK: threshold encryption public key
     :param SK: threshold encryption secret key
-    :param acs_out: a blocking function that returns an array of ciphertexts    
+    :param acs_out: a blocking function that returns an array of ciphertexts acs.get() 
     :return:
     """
     def encrypt(proposed):
@@ -23,7 +23,7 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
         # TODO: check that propose_in is the correct length, not too large
         key = os.urandom(32)    # random 256-bit key
         ciphertext = tpke.encrypt(key, proposed)
-        tkey = PK.encrypt(key)
+        tkey = ePK.encrypt(key)
 
         to_acs = pickle.dumps((serialize_UVW(*tkey), ciphertext))
         return to_acs
@@ -36,7 +36,7 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
                 continue
             (tkey, ciph) = pickle.loads(v)
             tkey = deserialize_UVW(*tkey)
-            share = SK.decrypt_share(*tkey)
+            share = eSK.decrypt_share(*tkey)
             # share is of the form: U_i, an serialized element of group1
             my_shares.append(tpke.group.serialize(share,compression=True))
         tpke_bcast(my_shares)
@@ -47,7 +47,7 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
             (j, shares) = tpke_recv()
             if j in shares_received:
                 # TODO: alert that we received a duplicate
-                logger.warn('Received a duplicate decryption share from', j)
+                logger.warn('Received a duplicate decryption share from {}'.format(j))
                 continue
             shares_received[j] = shares
         assert len(shares_received) >= f+1
@@ -66,7 +66,7 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
                 svec[j] = tpke.group.deserialize(shares[i],compression=True)      # Party j's share of broadcast i
             (tkey, ciph) = pickle.loads(v)
             tkey = deserialize_UVW(*tkey)
-            key = PK.combine_shares(*tkey, svec)
+            key = ePK.combine_shares(*tkey, svec)
             plain = tpke.decrypt(key, ciph)
             assert isinstance(plain, bytes)
             decryptions.append(plain.decode())
@@ -80,16 +80,15 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
     # Broadcast inputs are of the form (tenc(key), enc(key, transactions))
 
     prop = propose_in()
-
     to_acs = encrypt(prop)
-
     acs_in(to_acs)
-
+    logger.info("{} input encrypt proposed value to acs.".format(pid))
+    
     # Wait for the corresponding ACS to finish
     vall = acs_out()
     assert len(vall) == N
     assert len([_ for _ in vall if _ is not None]) >= N - f  # This many must succeed
-    logger.info("{} Received from acs {}".format(pid,vall))
+    logger.info("{} Received from acs".format(pid))
 
     # Broadcast all our decryption shares
     broadcast_shares(vall)
@@ -98,8 +97,9 @@ def honeybadger_block(pid, N, f, PK, SK, acs_out,rpcbase):
     # Receive everyone's shares
     shares_received = {}
     receive_all_shares(shares_received)
-    logger.info("{} Receive shares".format(pid))
     
+    # assert len(shares_received) == N
+    logger.info("{} Receive shares".format(pid))
     decryptions = decrypt(vall,shares_received)
     logger.info("{} honeybadgerBFT Done!".format(pid))
     

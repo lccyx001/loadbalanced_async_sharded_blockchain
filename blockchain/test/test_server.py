@@ -48,10 +48,10 @@ def test_broadcast_block():
     m = Message.create("block",bc.local_block)
     gl = gevent.spawn(server.broadcast,m) 
     gl.get()
+    bc.add_block()
     for i in range(4):
-        assert len(bcs[i].ledger) ==2
-
-    
+        print(i)
+        assert len(bcs[i].ledger) == 2
 
 if __name__ =="__main__":
     # test_broadcast_transaction()

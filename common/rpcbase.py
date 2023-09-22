@@ -15,8 +15,8 @@ class RPCBase(object):
         
     
     def connect_broadcast_channel(self):
-        logger.info("connect to:{}".format(self.broadcast_channel))
         if not self.remote_channels:
+            logger.info("connect to:{}".format(self.broadcast_channel))
             for id,adress in self.broadcast_channel:
                 client = zerorpc.Client()
                 client.connect(adress)   

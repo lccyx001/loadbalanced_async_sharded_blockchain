@@ -1,74 +1,59 @@
-import zerorpc
-from commoncoin import commoncoin
-from binaryagreement import binaryagreement
-from reliablebroadcast import reliablebroadcast
-from commonsubset import commonsubset
-from honeybadger_block import honeybadger_block
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.commoncoin import commoncoin
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.binaryagreement import binaryagreement
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.reliablebroadcast import reliablebroadcast
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.commonsubset import commonsubset
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger_block import honeybadger_block
 from loadbalanced_async_sharded_blockchain.common.config import Config
 import gevent
 
-def get_clients():
+def _get_clients():
     clients = []
     for i in range(4):
-        client = zerorpc.Client()
-        client.connect("tcp://127.0.0.1:{}000".format(i+2))
+        config = Config(i)
+        client = ClientBase(config.honeybadger_channels,config.honeybadger_host,config.honeybadger_port,config.N,config.id)
+        gevent.spawn(client.run_forever)
+        gevent.spawn(client.connect_broadcast_channel)
         clients.append(client)
     return clients
 
-def _make_honeybadger(sid,pid,N,f,PK,SK,ePK,eSK,client):
+def _make_honeybadger_block(sid,pid,N,f,PK,SK,ePK,eSK,client):
     def _setup(j):
         # setup coin
         cc_sid = sid + 'COIN' + str(j)
         coin = commoncoin(cc_sid,pid,N,f,PK,SK,client,j)
-        print("setup cc",pid,j)
-        # setup ba
-
-        ba_sid = sid + "BA" + str(j)
         
-        ba = gevent.spawn(binaryagreement,ba_sid,pid,N,f,coin,client,j)
-        print("setup ba",pid,j)
-
+        # setup ba
+        ba_sid = sid + "BA" + str(j)
+        gevent.spawn(binaryagreement,ba_sid,pid,N,f,coin,client,j)
+        
         # setup rbc
         rbc_sid = sid +  "RBC" + str(j)
-        # 
-        rbc = gevent.spawn(reliablebroadcast,rbc_sid,pid,N,f,j,client,j)
-        print("setup rbc",pid,j,"input",input)
-    
+        gevent.spawn(reliablebroadcast,rbc_sid,pid,N,f,j,client,j)
 
     for j in range(N):
         _setup(j)
-    acs = gevent.spawn(commonsubset,pid,N,f,client.rbc_out,client.aba_in,client.aba_out)
+    acs = gevent.spawn(commonsubset,pid,N,f,client)
     return honeybadger_block(pid,N,f,ePK,eSK,acs.get,client)
         
 
-def test_honeybader(clients,N=4):
-    badgers = [None] * N
+def test_honeybader_block(clients,N=4):
+    badger_blocks = [] 
     for i in range(N):
         cfg = Config(i)
-        badgers[i] = gevent.spawn(_make_honeybadger,"SID",cfg.id,cfg.N,cfg.f,cfg.PK,cfg.SK,cfg.ePK,cfg.eSK,clients[i])
-        print("setup badgers",i)
+        gl = gevent.spawn(_make_honeybadger_block,"SID",cfg.id,cfg.N,cfg.f,cfg.PK,cfg.SK,cfg.ePK,cfg.eSK,clients[i])
+        badger_blocks.append(gl) 
+        print("setup badger blocks",i)
 
     for i in range(N):
-        # if i ==1:
-        #     continue
         msg = "<[HBBFT Input {}]>".format(i)
-        print("input message",msg)
         clients[i].propose_set(msg)
-        # gevent.sleep(5)
+
     print("input message to badgers")
-    outs = [badgers[i].get() for i in range(N)]
+    outs = [badger_blocks[i].get() for i in range(N)]
     print("receive badgers")
-    for o in outs:
-        print(o)
-    
+    assert outs[0] == outs[1] == outs[2] == outs[3]
 
 if __name__ == "__main__":
-    clients = get_clients()
-    test_honeybader(clients,4)
-    # cfg = Config(0)
-    # _make_honeybadger("sida",0,4,1,cfg.PK,cfg.SK,cfg.ePK,cfg.eSK,clients[0])
-    # print(clients)
-    
-    
-
-
+    clients = _get_clients()
+    test_honeybader_block(clients,4)

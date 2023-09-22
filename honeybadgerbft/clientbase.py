@@ -5,6 +5,11 @@ from loadbalanced_async_sharded_blockchain.common.rpcbase import RPCBase
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
+#TODO:broadcast 函数有问题，先简化操作，再修改
+#TODO:
+#TODO:
+#TODO:
+
 class ClientBase(RPCBase):
 
     def __init__(self,broadcast_channels,host,port,N,id) -> None:
@@ -22,7 +27,7 @@ class ClientBase(RPCBase):
 
         # used in rbc
         self.rbc_recvs = [Queue() for _ in range(N)] # rbc use this queue to exchange message
-        self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
+        # self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
         self.rbc_input = Queue() # only rbc leader will call this queue to receive input
 
         # used for honeybaderblock
@@ -36,7 +41,7 @@ class ClientBase(RPCBase):
         self.aba_outputs = [Queue(1) for _ in range(N)] # ba output a value when finish and save it in this queue
         self.aba_inputs = [Queue(1) for _ in range(N)] # ba receive a upper input and save in this queue
         self.rbc_recvs = [Queue() for _ in range(N)] # rbc use this queue to exchange message
-        self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
+        # self.rbc_outputs = [Queue(1) for _ in range(N)] # rbc output value when finish and save it in this queue
         self.rbc_input = Queue() # only rbc leader will call this queue to receive input
         self.tpke_recv = Queue()
         self.proposed = Queue(1)
@@ -62,9 +67,10 @@ class ClientBase(RPCBase):
         j is the query index
         """
         assert len(message) == 2
+        raw_message = (self.id, ('ACS_COIN', message))
+        self.recv(raw_message)
         for target_id,(adress,client) in self.remote_channels.items():
             logger.debug("{} broadcast cc to:{}".format(self.id,target_id))
-            raw_message = (self.id, ('ACS_COIN', message))
             client.recv(raw_message)
      
     def receive_cc(self,j):
@@ -81,11 +87,11 @@ class ClientBase(RPCBase):
         In CONF phase form of (j, ('CONF', epoch, tuple(bin_values[epoch])))
         """
         assert len(message) == 2
+        raw_message = (self.id, ('ACS_ABA', message))
+        self.recv(raw_message)
         for target_id,(adress,client) in self.remote_channels.items():
             logger.debug("{} broadcast ba {} to:{}".format(self.id,message[1][0],target_id))
-            raw_message = (self.id, ('ACS_ABA', message))
             client.recv(raw_message)
-        return True
     
     def receive_ba(self,j):
         result = self.aba_recvs[j].get()
@@ -101,8 +107,9 @@ class ClientBase(RPCBase):
         return result
     
     def output_ba(self,vi,j):
-        logger.debug("{} output_ba {} in queue {}".format(self.id,vi,j))
+        logger.debug("{} ba's output is:{} in queue:{}".format(self.id,vi,j))
         self.aba_outputs[j].put_nowait(vi)
+        
     
     #### rbc ####
     def broadcast_rbc(self,message):
@@ -113,11 +120,11 @@ class ClientBase(RPCBase):
         In READY phase form of (j, ('READY', roothash))
         """
         assert len(message) == 2
+        raw_message = (self.id, ('ACS_RBC', message))
+        self.recv(raw_message)
         for target_id,(adress,client) in self.remote_channels.items():
             logger.debug("{} broadcast rbc {} to:{}".format(self.id,message[1][0],target_id))
-            raw_message = (self.id, ('ACS_RBC', message))
             client.recv(raw_message)
-        return True
     
     def send_rbc(self, target_id, message, j):
         """
@@ -125,7 +132,6 @@ class ClientBase(RPCBase):
         :param target_id: target instance pid
         :param message: form of ('VAL', roothash, branch, stripes[i], i) 
         :param j: index of rbc_recvs queue 
-        :param piece_idx: index of rbc stripes
         """
         assert len(message) == 5
         logger.debug("{} send to {} message:{}".format(self.id,target_id,message))
@@ -150,15 +156,15 @@ class ClientBase(RPCBase):
         logger.debug("{} input_rbc {}".format(self.id,result))
         return result
     
-    def rbc_in(self,m,j):
-        logger.debug("{} index:{} rbc_in {}".format(self.id,j,m))
-        self.rbc_outputs[j].put_nowait(m)
+    # def rbc_in(self,m,j):
+    #     logger.debug("{} index:{} rbc_in {}".format(self.id,j,m))
+    #     self.rbc_outputs[j].put_nowait(m)
 
     #### acs ####
-    def rbc_out(self,j):
-        result = self.rbc_outputs[j].get()
-        logger.debug("{} index:{} rbc_outputs {}".format(self.id,j,result))
-        return result
+    # def rbc_out(self,j):
+    #     result = self.rbc_outputs[j].get()
+    #     logger.debug("{} index:{} rbc_outputs {}".format(self.id,j,result))
+    #     return result
 
     def aba_in(self,vi,j):
         logger.debug("{} index:{} aba_in {}".format(self.id,j,vi))
