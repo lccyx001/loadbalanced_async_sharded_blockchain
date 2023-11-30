@@ -18,5 +18,5 @@ TODO list:
 1. Using DAG 
 2. Blockchain ledger out of memory
 3. Using loadbalancing
-4. 区块链可以运行多轮
+4. 区块链共识可以运行多轮
 ```

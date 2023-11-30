@@ -4,6 +4,7 @@ from loadbalanced_async_sharded_blockchain.blockchain.utils import Utils
 from loadbalanced_async_sharded_blockchain.blockchain.transaction import Transaction
 from loadbalanced_async_sharded_blockchain.blockchain.transaction_pool import TransactionPool
 from loadbalanced_async_sharded_blockchain.blockchain.ledger import Ledger
+from loadbalanced_async_sharded_blockchain.blockchain.account import Account
 import gevent
 from gevent.event import Event
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger import HoneyBadgerBFT
@@ -12,20 +13,6 @@ from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import Clie
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
-class Lock(object):
-
-    def __init__(self) -> None:
-        self._lock = Event()
-        self._lock.clear()
-
-    def lock(self):
-        self._lock.set()
-
-    def in_use(self):
-        return self._lock.ready()
-    
-    def unlock(self):
-        self._lock.clear()
 
 class Blockchain(object):
     
@@ -37,8 +24,6 @@ class Blockchain(object):
         self.local_tx = []
         self.count_tx = 0
         self.local_block = None
-        self._local_block_lock = Lock()
-
         self.shared_ledger = []
 
         _port = config.honeybadger_port
@@ -51,9 +36,9 @@ class Blockchain(object):
         pid = self._config.id
         self._pid = pid
         self._sid = "SID"
+        self._forged_geneis = False
+        self.account = Account()
         
-
-
 
     @property
     def last_block(self):
@@ -67,22 +52,17 @@ class Blockchain(object):
         return not self.tx_pool.empty()
 
     def forge_genesis_block(self):
-        # TODO:only call one time
+        if self._forged_geneis:
+            return False
         genesis_hash = "genesis block hash"
-        genesis_block = Block.forge(0, genesis_hash, [])
+        empty_tx = []
+        genesis_block = Block.forge(0, genesis_hash, empty_tx)
         genesis_block['hash'] = Utils.compute_hash(genesis_block)
         self._ledger.append(genesis_block)
         logging.info('Genesis block was created.')
 
     def forge_block(self):
         transactions = self.tx_pool.get_batch()
-        #TODO: cocurrent logic
-
-        # if self._local_block_lock.in_use():
-        #     return False
-        
-        # self._local_block_lock.lock()
-
         self._set_local_block(Block.forge(self.last_block['index'] + 1, self.last_block['hash'], transactions))
         logger.info("{} forge block.".format(self._pid))
 
@@ -92,14 +72,20 @@ class Blockchain(object):
         """
         data['index'] = self._get_tx_num()
         tx_raw = Transaction.new(data)
+
+        if not Transaction.validate(tx_raw,self.account):
+            logger.error("invalid tx:{}".format(tx_raw))
+            self.count_tx -= 1
+            return False
+        
         try:
             self.tx_pool.append(tx_raw)
         except Exception as e:
             self.count_tx -= 1
             logger.error(e)
 
-    def receive_txs(self,txs):
-        self.tx_pool.extend(txs)
+    # def receive_txs(self,txs):
+    #     self.tx_pool.extend(txs)
 
     def honeybadgerbft(self,):
         self._client.reset()
@@ -125,15 +111,15 @@ class Blockchain(object):
     def add_block(self):
         self._add_block()
 
-    def receive_block(self,block):
-        if not Block.validate(block):
-            return False
+    # def receive_block(self,block):
+    #     if not Block.validate(block):
+    #         return False
         
-        if not self._validate_previous_hash(block):
-            return False
+    #     if not self._validate_previous_hash(block):
+    #         return False
         
-        self.local_block = block
-        self._add_block()
+    #     self.local_block = block
+    #     self._add_block()
 
     # def _get_local_block(self):
     #     return self.local_block
@@ -145,7 +131,11 @@ class Blockchain(object):
 
     def _add_block(self):
         block = self.local_block
+        for tx in block["transactions"]:
+            self.account.execute_transaction(tx)
+
         self.ledger.append(block)
+
         self.tx_pool.clear_tx(block)
         self._clear_local_block()
         logger.info('Block #{} was inserted into the ledger'.format(block['index']))

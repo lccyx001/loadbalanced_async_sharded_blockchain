@@ -1,7 +1,7 @@
 import time
 from loadbalanced_async_sharded_blockchain.blockchain.blockchain import Blockchain
-from loadbalanced_async_sharded_blockchain.blockchain.server import Server
-from loadbalanced_async_sharded_blockchain.blockchain.message import Message
+# from loadbalanced_async_sharded_blockchain.blockchain.server import Server
+# from loadbalanced_async_sharded_blockchain.blockchain.message import Message
 from loadbalanced_async_sharded_blockchain.common.config import Config
 import logging
 import gevent
@@ -16,12 +16,6 @@ class Node(object):
         
         config = Config(id)
         block_chain =Blockchain(config)
-        server = Server(config,block_chain)
-
-        self.server_let = gevent.spawn(server.run_forever)
-        server.connect_broadcast_channel()
-
-        self.server = server
         self.block_chain = block_chain
     
     def submit_tx(self,data):
@@ -49,10 +43,10 @@ class Node(object):
 
             if not self.block_chain.ready():
                 return
-                logger.info("not ready,now sleep")
-                time.sleep(3)
-                break  # for test
-                continue
+                # logger.info("not ready,now sleep")
+                # time.sleep(3)
+                # break  # for test
+                # continue
             
             self.block_chain.forge_block()
             try:
@@ -64,5 +58,23 @@ class Node(object):
             self.block_chain.add_block()
             logger.info("{}:mined one block.".format(self.id))
 
-    def ping_pong(self):
-        pass
+    def mine_onetime(self):
+        # if not self.block_chain.ready():
+        #     return
+            # logger.info("not ready,now sleep")
+            # time.sleep(3)
+            # break  # for test
+            # continue
+        
+        self.block_chain.forge_block()
+        try:
+            self.block_chain.honeybadgerbft()
+        except Exception as e:
+            traceback.print_exc()
+            logger.error(e)
+        self.block_chain.add_block()
+        logger.info("{}:mined one block.".format(self.id))
+
+    def mock_account(self,accounts):
+        for acc in accounts:
+            self.block_chain.account.mock_account(acc)
