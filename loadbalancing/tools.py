@@ -1,7 +1,8 @@
 import csv
 import pymysql
-from hash_sharding import make_sharding
 import time
+from hash_sharding import make_sharding
+from graph_sharding import data_pre_handler,calculate_sharding,apply_sharding_result
 
 def _get_connections():
     conn = pymysql.connect(host="host.docker.internal",port=3307,user="root",password="root",db="blockchain-test", connect_timeout=7200)
@@ -37,7 +38,7 @@ def load_data_to_mysql(filename):
             if len(datas)>0:
                 _write_to_mysql()
 
-def do_hash_sharding():
+def do_hash_sharding(shard=4):
     offset = 0
     limit = 1000
     conn = _get_connections()
@@ -61,19 +62,27 @@ def do_hash_sharding():
 
         _write_to_mysql()
         offset += limit
-        # break
-        
-def counting(tablename):
+
+def counting(tablename="hash_sharding"):
     conn = _get_connections()
     cursor = conn.cursor()
-    query_sql = "select count(1) from hash_sharding"
+    query_sql = "select count(1) from {}".format(tablename)
     cursor.execute(query_sql)
     total =cursor.fetchall()[0][0]
     
-    cursor.execute("select count(1) from hash_sharding WHERE `cross` = 1;")
+    cursor.execute("select count(1) from {} WHERE `cross` = 1;".format(tablename))
     cross = cursor.fetchall()[0][0]
+
     print("total txs: %d cross txs: %d, cross percentage %f" % (total, cross, cross/total))
 
+def do_graph_sharding(shard=4):
+    conn = _get_connections()
+    cursor = conn.cursor()
+    data_pre_handler(cursor,conn)
+    calculate_sharding(cursor,conn,shard)
+    apply_sharding_result(cursor,conn)
+    # 直接一个batch一个batch的执行
+    
 
 
         
@@ -82,4 +91,6 @@ if __name__ == "__main__":
     # for filename in csvdatas:
     #     load_data_to_mysql(filename)
     # do_hash_sharding()
-    counting()
+    counting("graph_sharding")
+    counting("hash_sharding")
+    # do_graph_sharding()
