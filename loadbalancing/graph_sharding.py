@@ -1,38 +1,50 @@
 import time
 import networkx as nx
 # import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import json
+# import numpy as np
+# import pandas as pd
+# import json
 # import sklearn
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import csr_matrix
 from sklearn.cluster import KMeans
 
-def data_pre_handler(cursor,conn):
-    _extract_to_graph_tx(cursor,conn)
+def graph_sharding(cursor,conn,shard,totals,pre_handler=True):
+    if pre_handler:
+        data_pre_handler(cursor,conn,totals)
+    _calculate_sharding(cursor,conn,shard)
+    _apply_sharding_result(cursor,conn,totals)
+
+def data_pre_handler(cursor,conn,totals):
+    _extract_to_graph_tx(cursor,conn,totals)
     _extract_to_graph_tx_distinct(cursor,conn)
     _build_id_hash_str_map(cursor,conn)
 
-def calculate_sharding(cursor,conn,shard=4):
+def _calculate_sharding(cursor,conn,shard=4):
     matrix = _build_adjacency_matrix(cursor,conn)
     matrix = _get_simility_matrix(matrix)
     labels = _kmeanspp(matrix,shard)
     _sharding(cursor,conn,labels,0)
 
-def _extract_to_graph_tx(cursor,conn):
+def _extract_to_graph_tx(cursor,conn,totals):
     offset = 0
     limit = 1000
-    while True:
-        # start = time.time()
-        query_sql = "SELECT `transactionHash`, `from`, `to`, `value` FROM transactions LIMIT {offset}, {limit};"
-        cursor.execute(query_sql.format(offset=offset,limit=limit))
-        res = cursor.fetchall()
+    while offset < totals:
+        start = time.time()
+        res = _get_batch_transactions(cursor,offset,limit)
         if not len(res):
             break
         datas = _get_user_tx_times(res)
         _write_to_graph_tx(cursor,datas,conn)
         offset += limit
+        end =  time.time()
+        print("_extract_to_graph_tx offset",offset,"costs:",end - start)
+
+def _get_batch_transactions(cursor,offset,limit):
+    query_sql = "SELECT `transactionHash`, `from`, `to`, `value` FROM transactions LIMIT {offset}, {limit};"
+    cursor.execute(query_sql.format(offset=offset,limit=limit))
+    res = cursor.fetchall()
+    return res
 
 # 用户交易次数求和
 def _get_user_tx_times(batch):
@@ -40,6 +52,8 @@ def _get_user_tx_times(batch):
     for idx, row in enumerate(batch):
         from_hash = row[1]
         to_hash = row[2]
+        if from_hash == 'None' or to_hash == 'None':
+                continue
         first = from_hash if from_hash > to_hash else to_hash
         second = from_hash if from_hash <= to_hash else to_hash
         key = "%s_%s" % (first,second) 
@@ -77,7 +91,6 @@ def _extract_to_graph_tx_distinct(cursor,conn):
         offset += limit
         e = time.time()
         print("extract_to_graph_tx_distinct:offset:{} costs:{}".format(offset,e-s))
-        # break
 
 def _write_to_graph_tx_distinct(cursor,datas,conn):
     sql = "INSERT INTO graph_tx_distinct (`txone`, `txtwo`, `tx_times`) VALUES (%s, %s, %s)"  
@@ -131,8 +144,8 @@ def _get_user_map(cursor, shard=False):
 def _build_adjacency_matrix(cursor,conn,limit=10000):
     user_map = _get_user_map(cursor)
     a = time.time()
-    # query_sql = "SELECT txone,txtwo,tx_times from graph_tx_distinct;"
-    query_sql = "SELECT txone,txtwo,tx_times from graph_tx_distinct LIMIT 0,{limit};".format(limit=limit)
+    query_sql = "SELECT txone,txtwo,tx_times from graph_tx_distinct;"
+    # query_sql = "SELECT txone,txtwo,tx_times from graph_tx_distinct LIMIT 0,{limit};".format(limit=limit)
     cursor.execute(query_sql)
     res = cursor.fetchall()
     G = nx.Graph()
@@ -190,34 +203,33 @@ def _sharding(cursor,conn,labels,offset=0):
     b= time.time()
     print("update sharding costs:",b-a)
 
-def apply_sharding_result(cursor,conn,):
-    # query user map get sharding info
-    # if no sharding info pass
+
+
+def _apply_sharding_result(cursor,conn,totals):
     a = time.time()
     user_map = _get_user_map(cursor,shard=True)
     offset = 0
     limit = 1000
     data = []
-    while True:
+    while offset<totals:
         start = time.time()
-        query_sql = "SELECT `transactionHash`, `from`, `to`, `value` FROM transactions LIMIT {offset}, {limit};"
-        cursor.execute(query_sql.format(offset=offset,limit=limit))
-        res = cursor.fetchall()
+        res = _get_batch_transactions(cursor,offset,limit)
         if not len(res):
             break
         
         for row in res:
-            if len(data)>500:
+            if len(data)>100:
                 sql =  "INSERT INTO graph_sharding (`transactionHash`, `from`, `to`, `value`,`from_shard`,`to_shard`,`cross`) VALUES (%s, %s, %s, %s, %s, %s, %s)" 
                 cursor.executemany(sql,data)
                 conn.commit()
                 data = []
-                print("save 500 to db query to ",offset)
                 
             tx_hahsh = row[0]
             value = row[3]
             from_hash = row[1]
             to_hash = row[2]
+            if from_hash == 'None' or to_hash == 'None':
+                continue
             from_shard= user_map.get(from_hash)
             to_shard = user_map.get(to_hash)
             if not from_shard or not to_shard:

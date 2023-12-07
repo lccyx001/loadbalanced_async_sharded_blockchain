@@ -1,8 +1,9 @@
 import csv
 import pymysql
 import time
-from hash_sharding import make_sharding
-from graph_sharding import data_pre_handler,calculate_sharding,apply_sharding_result
+from evalating import counting
+from hash_sharding import hash_sharding
+from graph_sharding import data_pre_handler,_calculate_sharding,_apply_sharding_result,graph_sharding
 
 def _get_connections():
     conn = pymysql.connect(host="host.docker.internal",port=3307,user="root",password="root",db="blockchain-test", connect_timeout=7200)
@@ -38,59 +39,42 @@ def load_data_to_mysql(filename):
             if len(datas)>0:
                 _write_to_mysql()
 
-def do_hash_sharding(shard=4):
-    offset = 0
-    limit = 1000
+def do_hash_sharding(shard=4,totals=100000):
+    a = time.time()
     conn = _get_connections()
     cursor = conn.cursor()
-    while True:
-        start = time.time()
-        query_sql = "SELECT `transactionHash`, `from`, `to`, `value` FROM transactions LIMIT {offset}, {limit};"
-        cursor.execute(query_sql.format(offset=offset,limit=limit))
-        res = cursor.fetchall()
-        if not len(res):
-            break
-        datas = make_sharding(res, 4)
-        # print(datas[0])
-        def _write_to_mysql():
-            sql = "INSERT INTO hash_sharding (`transactionHash`, `from`, `to`, `value`,`from_shard`,`to_shard`,`cross`) VALUES (%s, %s, %s, %s, %s, %s, %s)"  
-            cursor.executemany(sql,datas)
-            conn.commit()
-            end = time.time()
-            print("loading to %d, costs %d seconds." % (offset,end-start) )
-            
+    hash_sharding(cursor,conn,shard,totals=totals)
+    b = time.time()
+    print("Finish! costs",b-a)
+    counting(cursor, conn, "hash_sharding")
 
-        _write_to_mysql()
-        offset += limit
-
-def counting(tablename="hash_sharding"):
+def do_graph_sharding(shard=4,totals=100000):
+    a = time.time()
     conn = _get_connections()
     cursor = conn.cursor()
-    query_sql = "select count(1) from {}".format(tablename)
-    cursor.execute(query_sql)
-    total =cursor.fetchall()[0][0]
+    graph_sharding(cursor,conn,shard,totals)
+    b = time.time()
+    print("Finish! costs",b-a)
+    counting(cursor, conn, "graph_sharding")
+
+def clear(hash_s=True,graph_s=True):
+    cursor = _get_connections().cursor()
+    if hash_s:
+        cursor.execute("TRUNCATE table hash_sharding;")
+    if graph_s:
+        cursor.execute("TRUNCATE table graph_sharding;")
+        cursor.execute("TRUNCATE table graph_tx;")
+        cursor.execute("TRUNCATE table graph_tx_distinct;")
+        cursor.execute("TRUNCATE table graph_user_hash;")
+
     
-    cursor.execute("select count(1) from {} WHERE `cross` = 1;".format(tablename))
-    cross = cursor.fetchall()[0][0]
-
-    print("total txs: %d cross txs: %d, cross percentage %f" % (total, cross, cross/total))
-
-def do_graph_sharding(shard=4):
-    conn = _get_connections()
-    cursor = conn.cursor()
-    data_pre_handler(cursor,conn)
-    calculate_sharding(cursor,conn,shard)
-    apply_sharding_result(cursor,conn)
-    # 直接一个batch一个batch的执行
-    
-
-
-        
 if __name__ == "__main__":
     # csvdatas = ["../resource/0to999999_BlockTransaction.csv"]
     # for filename in csvdatas:
     #     load_data_to_mysql(filename)
-    # do_hash_sharding()
-    counting("graph_sharding")
-    counting("hash_sharding")
-    # do_graph_sharding()
+    shard = 4 # 分片数
+    totals = 100000 # 交易总量
+    # clear(hash_s=False)
+    # do_hash_sharding(shard,totals)
+    do_graph_sharding(shard,totals)
+    
