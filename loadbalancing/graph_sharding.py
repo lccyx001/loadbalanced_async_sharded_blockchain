@@ -7,13 +7,14 @@ import networkx as nx
 # import sklearn
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import csr_matrix
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans,SpectralClustering
 
-def graph_sharding(cursor,conn,shard,totals,pre_handler=True):
+def graph_sharding(cursor,conn,shard,totals,pre_handler=True,):
     if pre_handler:
         data_pre_handler(cursor,conn,totals)
     _calculate_sharding(cursor,conn,shard)
     _apply_sharding_result(cursor,conn,totals)
+    # _load_balancing(cursor,conn,totals=totals)
 
 def data_pre_handler(cursor,conn,totals):
     _extract_to_graph_tx(cursor,conn,totals)
@@ -23,8 +24,10 @@ def data_pre_handler(cursor,conn,totals):
 def _calculate_sharding(cursor,conn,shard=4):
     matrix = _build_adjacency_matrix(cursor,conn)
     matrix = _get_simility_matrix(matrix)
-    labels = _kmeanspp(matrix,shard)
+    # labels = _kmeanspp(matrix,shard)
+    labels=_SpectralClustering(matrix,shard)
     _sharding(cursor,conn,labels,0)
+
 
 def _extract_to_graph_tx(cursor,conn,totals):
     offset = 0
@@ -53,7 +56,7 @@ def _get_user_tx_times(batch):
         from_hash = row[1]
         to_hash = row[2]
         if from_hash == 'None' or to_hash == 'None':
-                continue
+            continue
         first = from_hash if from_hash > to_hash else to_hash
         second = from_hash if from_hash <= to_hash else to_hash
         key = "%s_%s" % (first,second) 
@@ -184,6 +187,14 @@ def _kmeanspp(matrix,k):
     print("kmeans costs:",b-a)
     return labels
 
+def _SpectralClustering(matrix,k):
+    a = time.time()
+    spectral_clustering = SpectralClustering(n_clusters=k, affinity='nearest_neighbors', random_state=0)
+    labels = spectral_clustering.fit_predict(matrix)
+    b = time.time()
+    print("_SpectralClustering costs:",b-a)
+    return labels
+
 def _sharding(cursor,conn,labels,offset=0):
     cursor.execute("select min(id) from graph_user_hash;")
     idstart = cursor.fetchone()[0]
@@ -202,8 +213,6 @@ def _sharding(cursor,conn,labels,offset=0):
             conn.commit()
     b= time.time()
     print("update sharding costs:",b-a)
-
-
 
 def _apply_sharding_result(cursor,conn,totals):
     a = time.time()
@@ -232,7 +241,7 @@ def _apply_sharding_result(cursor,conn,totals):
                 continue
             from_shard= user_map.get(from_hash)
             to_shard = user_map.get(to_hash)
-            if not from_shard or not to_shard:
+            if from_shard is None or to_shard is None:
                 continue
             cross = 1 if from_shard != to_shard else 0 
             data.append([tx_hahsh,from_hash,to_hash,value,from_shard,to_shard,cross])
@@ -249,8 +258,98 @@ def _apply_sharding_result(cursor,conn,totals):
     z = time.time()
     print("apply_sharding_result costs:",z-a)
         
-        
+# def _load_balancing(cursor,conn,totals,tilt_threshold=0.05):
 
+#     def _get_current_loads():
+#         # 查询统计每个分片上的负载
+#         cursor.execute("SELECT from_shard,count(1) from graph_sharding GROUP BY from_shard ORDER BY from_shard;")
+#         groups = cursor.fetchall()
+#         current_loads = []
+#         for group in groups:
+#             current_loads.append(group[1])
+#         return current_loads
+
+#     def _balance_array(arr):
+#         #将数组尽量平衡，并返回迁移方案
+#         total = sum(arr)
+#         transfer = [] # (from , to, amout)
+
+#         threshold = tilt_threshold * total
+#         print("threshold",threshold)
+#         while True:
+#             if max(arr) - min(arr) < threshold:
+#                 break
+#             max_idx = arr.index(max(arr))
+#             min_idx = arr.index(min(arr))
+#             transfer_load = int((max(arr)- min(arr)) / 2)
+#             transfer.append([max_idx,min_idx,transfer_load])
+#             arr[max_idx] -= transfer_load
+#             arr[min_idx] += transfer_load
+#         # merage transfer
+#         for i,record in enumerate(transfer):
+#             for j , b_record in enumerate(transfer):
+#                 if (b_record[0]==record[1]):
+#                     if(record[2]>b_record[2]):
+#                         record[2] -= b_record[2]
+#                         b_record[0] = record[0]
+#         return arr,transfer
+    
+#     def migrate_load(transfor_array,threshold=0.1):
+#         # 根据merge后的transfor 指定迁移方案，优先迁移片内负载
+#         # 片内负载转移完成后，统计失败的片间负载转移
+#         for migration in transfor_array:
+#             from_shard,to_shard,counting = migration
+#             # 迁移交易特别多的人
+#             query_vip = """SELECT  `from`,`to`,from_shard,to_shard,`cross`,COUNT(1) t 
+#             from graph_sharding GROUP BY `from`,`to`,from_shard,to_shard,`cross` HAVING  from_shard={} AND to_shard={} ORDER BY t desc""".format(from_shard,from_shard)
+#             cursor.execute(query_vip)
+#             res = cursor.fetchall()
+#             need_migrate = set()
+#             count = 0
+#             for r in res:
+#                 from_hash = r[0]
+#                 to_hash = r[1]
+#                 need_migrate.add(from_hash)
+#                 need_migrate.add(to_hash)
+#                 count += r[5]
+#                 if abs(count-counting)/counting <threshold:
+#                     print("count",count,"counting",counting,"condition",abs(count-counting)/counting)
+#                     data = []
+#                     c = 0
+#                     it = list(need_migrate)
+#                     print("need update",len(list(it)))
+#                     for hashstr in list(it):
+#                         data.append([to_shard,hashstr])
+#                         if len(data)>100:
+#                             cursor.executemany("""UPDATE graph_sharding SET from_shard=%s WHERE `from` = %s;""",data)
+#                             cursor.executemany("""UPDATE graph_sharding SET to_shard=%s WHERE `to` = %s;""",data)
+#                             conn.commit()
+#                             data = []
+#                             c+=100
+#                             print("execute update",100)
+#                     else:
+#                         cursor.executemany("""UPDATE graph_sharding SET from_shard=%s WHERE `from` = %s;""",data)
+#                         cursor.executemany("""UPDATE graph_sharding SET to_shard=%s WHERE `to` = %s;""",data)
+#                         conn.commit()
+#                         data = []
+#                     break
+#             break
+#         # pass
+
+#     current_loads = _get_current_loads()    
+#     # 设定一个阈值，当其他分片之间的负载倾斜超过这个值，就执行下面的步骤
+#     if max(current_loads) - min(current_loads) < tilt_threshold * totals:
+#         return
+    
+#     # 1.计算分片之间互相要转移的系统负载
+#     print("before loadbalancing",current_loads,"total",sum(current_loads))
+#     balanced_loads,transfor_array = _balance_array(current_loads)
+#     print(balanced_loads,"total",sum(balanced_loads))
+#     print(transfor_array)
+#     # 2. 寻找合适的负载，进行负载迁移
+#     # migrate_load(transfor_array, )
+#     print("")
+#     pass     
 
 def _compare_two_matrix(matrix1,matrix2):
     for ridx, row in enumerate(matrix1) :

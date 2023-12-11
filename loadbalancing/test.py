@@ -1,31 +1,21 @@
-# import pymysql
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import SpectralClustering
 
-# # Assuming you already have a connection to your MySQL database
-# connection = pymysql.connect(host="host.docker.internal",port=3307,user="root",password="root",db="blockchain-test", connect_timeout=7200)
+# 生成示例的二维矩阵数据
+matrix_data = np.random.rand(10, 10)
 
-# try:
-#     with connection.cursor() as cursor:
-#         # SQL update statement
-#         # update_query = "update graph_user_hash set `shard`=%s where id=%s"
+# 使用 Spectral Clustering 进行聚类
+n_clusters = 3
+spectral_clustering = SpectralClustering(n_clusters=n_clusters, affinity='nearest_neighbors', random_state=0)
+labels = spectral_clustering.fit_predict(matrix_data)
+print(labels)
+# # 绘制聚类结果
+# plt.imshow(matrix_data, cmap='viridis')
+# plt.title('Original Matrix')
+# plt.show()
 
-#         # # Data for batch update
-#         # update_data = [
-#         #     (1,1),
-#         #     (1,2),
-#         #     # Add more tuples as needed
-#         # ]
-
-#         # # Execute the batch update
-#         # cursor.executemany(update_query, update_data)
-#         cursor.execute("select min(id) from graph_user_hash;")
-#         minid = cursor.fetchone()[0]
-#         print(minid)
-
-#     # Commit the changes
-#     connection.commit()
-
-# finally:
-#     # Close the connection
-#     connection.close()
-if not True or not False:
-    print(1)
+# # 绘制聚类结果
+# plt.scatter(range(len(labels)), [0] * len(labels), c=labels, cmap='viridis', s=100)
+# plt.title('Spectral Clustering Result')
+# plt.show()

@@ -46,7 +46,7 @@ def do_hash_sharding(shard=4,totals=100000):
     hash_sharding(cursor,conn,shard,totals=totals)
     b = time.time()
     print("Finish! costs",b-a)
-    counting(cursor, conn, "hash_sharding")
+    # counting(cursor, conn, "hash_sharding")
 
 def do_graph_sharding(shard=4,totals=100000):
     a = time.time()
@@ -55,7 +55,7 @@ def do_graph_sharding(shard=4,totals=100000):
     graph_sharding(cursor,conn,shard,totals)
     b = time.time()
     print("Finish! costs",b-a)
-    counting(cursor, conn, "graph_sharding")
+    # counting(cursor, conn, "graph_sharding")
 
 def clear(hash_s=True,graph_s=True):
     cursor = _get_connections().cursor()
@@ -72,9 +72,16 @@ if __name__ == "__main__":
     # csvdatas = ["../resource/0to999999_BlockTransaction.csv"]
     # for filename in csvdatas:
     #     load_data_to_mysql(filename)
+
+    clear()
+
     shard = 4 # 分片数
     totals = 100000 # 交易总量
-    # clear(hash_s=False)
-    # do_hash_sharding(shard,totals)
+    do_hash_sharding(shard,totals)
     do_graph_sharding(shard,totals)
+    
+    conn = _get_connections()
+    cursor = conn.cursor()
+    counting(cursor, conn, "hash_sharding",shard)
+    counting(cursor, conn, "graph_sharding",shard)
     
