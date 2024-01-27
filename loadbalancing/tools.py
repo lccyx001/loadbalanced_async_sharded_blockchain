@@ -77,11 +77,11 @@ if __name__ == "__main__":
 
     shard = 4 # 分片数
     totals = 100000 # 交易总量
-    do_hash_sharding(shard,totals)
-    do_graph_sharding(shard,totals)
+    # do_hash_sharding(shard,totals)
+    # do_graph_sharding(shard,totals)
     
     conn = _get_connections()
     cursor = conn.cursor()
-    counting(cursor, conn, "hash_sharding",shard)
+    # counting(cursor, conn, "hash_sharding",shard)
     counting(cursor, conn, "graph_sharding",shard)
     

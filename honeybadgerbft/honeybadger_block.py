@@ -1,5 +1,6 @@
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto import threshenc as tpke
 from loadbalanced_async_sharded_blockchain.honeybadgerbft.utils import serialize_UVW,deserialize_UVW
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto.threshenc import TPKEPrivateKey,TPKEPublicKey
 import os
 import pickle
 import logging
@@ -7,14 +8,14 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,filename="log.log")
 
-def honeybadger_block(pid, N, f, ePK, eSK, acs_out,rpcbase):
+def honeybadger_block(pid, N, f, ePK:TPKEPublicKey, eSK:TPKEPrivateKey, acs_out,rpcbase):
     """The HoneyBadgerBFT algorithm for a single block
 
     :param pid: my identifier
     :param N: number of nodes
     :param f: fault tolerance
-    :param PK: threshold encryption public key
-    :param SK: threshold encryption secret key
+    :param ePK: threshold encryption public key
+    :param eSK: threshold encryption secret key
     :param acs_out: a blocking function that returns an array of ciphertexts acs.get() 
     :return:
     """

@@ -24,8 +24,8 @@ def data_pre_handler(cursor,conn,totals):
 def _calculate_sharding(cursor,conn,shard=4):
     matrix = _build_adjacency_matrix(cursor,conn)
     matrix = _get_simility_matrix(matrix)
-    # labels = _kmeanspp(matrix,shard)
-    labels=_SpectralClustering(matrix,shard)
+    labels = _kmeanspp(matrix,shard)
+    # labels=_SpectralClustering(matrix,shard)
     _sharding(cursor,conn,labels,0)
 
 

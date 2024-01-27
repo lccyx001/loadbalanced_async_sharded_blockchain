@@ -1,21 +1,17 @@
+import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import SpectralClustering
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.sparse import csr_matrix
 
-# 生成示例的二维矩阵数据
-matrix_data = np.random.rand(10, 10)
+adjacency_matrix = np.array([[0,3,1,0,0],
+                             [3,0,4,0,5],
+                             [1,4,0,10,2],
+                             [0,0,10,0,6],
+                             [0,5,2,6,0]])
 
-# 使用 Spectral Clustering 进行聚类
-n_clusters = 3
-spectral_clustering = SpectralClustering(n_clusters=n_clusters, affinity='nearest_neighbors', random_state=0)
-labels = spectral_clustering.fit_predict(matrix_data)
-print(labels)
-# # 绘制聚类结果
-# plt.imshow(matrix_data, cmap='viridis')
-# plt.title('Original Matrix')
-# plt.show()
-
-# # 绘制聚类结果
-# plt.scatter(range(len(labels)), [0] * len(labels), c=labels, cmap='viridis', s=100)
-# plt.title('Spectral Clustering Result')
-# plt.show()
+csr_adj_matrix = csr_matrix(adjacency_matrix)
+csr_trans_matrix = csr_matrix(adjacency_matrix.transpose())
+simility_matrix = cosine_similarity(csr_adj_matrix,csr_trans_matrix)
+print(simility_matrix)
