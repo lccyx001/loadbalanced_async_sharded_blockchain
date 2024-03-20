@@ -1,4 +1,9 @@
-# loadbalanced_async_sharded_blockchain
+# 负载均衡异步分片区块链
+
+一个负载均衡的异步区块链demo
+
+环境构建
+
 A loadbalanced async sharded blockchain demo.
 
 Now under developing.
