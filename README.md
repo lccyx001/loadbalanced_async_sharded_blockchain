@@ -10,7 +10,13 @@ Now under developing.
 
 How to eastablish it?
 
-Dependencys:
+Install docker
+
+```
+docker pull sbellem/charm-crypto
+```
+
+Update dependencys:
 ```
 sudo apt install gcc 
 sudo apt-get install -y autoconf automake build-essential libffi-dev libtool pkg-config python3-dev
@@ -23,5 +29,5 @@ TODO list:
 1. Using DAG 
 2. Blockchain ledger out of memory
 3. Using loadbalancing
-4. 区块链共识可以运行多轮
+4. Blockchain concensus can run multiple rounds
 ```
