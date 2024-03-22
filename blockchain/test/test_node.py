@@ -6,7 +6,9 @@ fake = Faker()
 
 def get_nodes(shard_number, N, B):
     nodes = [Node(i % shard_number, i, B) for i  in range(N)]
-    print("shard:", shard_number, "per shard nodes:", N/shard_number )
+    # print("shard:", shard_number, "per shard nodes:", N/shard_number ,)
+    for node in nodes:
+        print("shard no",node.shard_no)
     return nodes
 
 def generate_random_str(randomlength=16):
@@ -47,12 +49,12 @@ def send_txs(nodes, transactions):
         nodes[idx % N].add_tx(tx)
 
 if __name__ == "__main__":
+    N = 8
+    shard_number = 2
     stringlength = 167
-    N = 4
-    B = 1000 
-    shard_number = 1
-    txs_per_node = 256
-    cross_proportion = 1
+    B = 10000 
+    txs_per_node = 4096
+    cross_proportion = 0
     print("----------------test Node ----------------")
     transactions = generateTransactions( N * txs_per_node ,cross_proportion)
     nodes = get_nodes(shard_number, N, B)

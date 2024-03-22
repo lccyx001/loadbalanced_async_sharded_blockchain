@@ -1,9 +1,7 @@
 import sys
 sys.path.append(r'..')
 import yaml
-from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto.threshsig.boldyreva import dealer
-# import json
-# import pickle
+
 
 def generate_config(N,f):
     host_array = ['127.0.0.1'] * N
@@ -36,20 +34,13 @@ def generate_config(N,f):
             "channels":badger_channels
         }
         data[node_key]["honeybadger"] = honeybadger
-    print(data)
+    # print(data)
     with open('./config.yaml','w',encoding='utf-8') as f:
         yaml.dump(data,stream=f,allow_unicode=True)
-    
-
-
-# if __name__ == "__main__":
-    
-#     
-
-if __name__ == "__main__":
-    N , f = 4, 1
-    generate_config(N,f)
     print("generate yaml config success")
+    
+def generate_sign_secret(N,f):
+    from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto.threshsig.boldyreva import dealer
     PK, SKs = dealer(N, f+1)  
 
     data =PK.serialize()
@@ -75,6 +66,42 @@ if __name__ == "__main__":
         # print(obj_dict)
         # print("####################")
     print("generate secret keys success.")
+    
+def generate_enc_secret(N,f):
+    from loadbalanced_async_sharded_blockchain.honeybadgerbft.crypto import threshenc as tpke
+    dealer = tpke.dealer
+    PK, SKs = dealer(N, f+1)  
+
+    data =PK.serialize()
+    # print(data)
+    # print(data)
+    with open("epk",'wb')as f:
+        f.write(data)
+    with open("epk",'rb') as f:
+        data = f.read()
+    obj_dict = PK.deserialize(data)
+    # print(obj_dict)
+    # print("******************")
+
+    for idx,sk in enumerate(SKs):
+        data =sk.serialize()
+        # print(data)
+        # print(data)
+        with open("esk{}".format(idx),"wb")as f:
+            f.write(data)
+        with open("esk{}".format(idx),"rb") as f:
+            data = f.read()
+        obj_dict = sk.deserialize(data)
+        # print(obj_dict)
+        # print("####################")
+    print("generate enc secret keys success.")
+
+if __name__ == "__main__":
+    N , f = 8, 2
+    generate_config(N,f)
+    generate_sign_secret(N,f)
+    generate_enc_secret(N,f)
+    
     
     
 
