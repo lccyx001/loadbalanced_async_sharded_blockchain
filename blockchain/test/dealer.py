@@ -97,7 +97,7 @@ def generate_enc_secret(N,f):
     print("generate enc secret keys success.")
 
 if __name__ == "__main__":
-    N , f = 8, 2
+    N , f = 32, 8
     generate_config(N,f)
     generate_sign_secret(N,f)
     generate_enc_secret(N,f)

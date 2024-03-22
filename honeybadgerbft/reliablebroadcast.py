@@ -90,8 +90,8 @@ def reliablebroadcast(sid, pid, N, f, leader, rpcbase:ClientBase,query_index):
         m = input()  # block until an input is received
         assert isinstance(m,(str,bytes))
         logger.info("{} received {} bytes.".format(pid,len(m)))
-        print("{} received {} bytes.".format(pid,len(m)))
-        
+        # print("{} received {} bytes.".format(pid,len(m)))
+        rpcbase.load = len(m)
 
         broadcast_stripes = ErasureCode.encode(K, N, m)
         mt = merkleTree(broadcast_stripes)  # full binary tree

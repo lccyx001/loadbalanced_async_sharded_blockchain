@@ -33,7 +33,10 @@ class ClientBase(RPCBase):
         # used for honeybaderblock
         self.tpke_recv = Queue()
         self.proposed = Queue(1)
-    
+
+        # metric
+        self.load = 0
+        
     def reset(self,):
         N = self.N
         self.coin_recvs = [Queue() for _ in range(N)]  

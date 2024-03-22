@@ -31,7 +31,10 @@ class Node(object):
         
         config = Config(self.no)
         self.concensus = HoneyBadgerBFTConcensus(config)
-    
+
+        self.load = 0
+        
+        
     def add_user(self,user_hash, balance):
         self.user_tree.add_user(user_hash, balance)
     
@@ -108,3 +111,4 @@ class Node(object):
         self.add_block()
         b = time.time()
         logger.info("{}:mined one block. cost:{} s".format(self.no,b-a))
+        self.load = self.concensus.get_load()

@@ -115,4 +115,6 @@ class HoneyBadgerBFTConcensus(object):
         self.logger.info("finish one round concensus, txs:{}".format(len(comfirmed_txs)))
         
         return comfirmed_txs
-        
+    
+    def get_load(self,):
+        return self.client.load
