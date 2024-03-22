@@ -1,14 +1,71 @@
 from loadbalanced_async_sharded_blockchain.blockchain.core import *
 from loadbalanced_async_sharded_blockchain.blockchain.node import Node
+import random
+from faker import Faker
+fake = Faker()
+
+def get_nodes(shard_number, N, B):
+    nodes = [Node(i % shard_number, i, B) for i  in range(N)]
+    print("shard:", shard_number, "per shard nodes:", N/shard_number )
+    return nodes
+
+def generate_random_str(randomlength=16):
+    """
+    生成一个指定长度的随机字符串
+    """
+    random_str = ''
+    base_str = 'ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
+    length = len(base_str) - 1
+    for i in range(randomlength):
+        random_str += base_str[random.randint(0, length)]
+    return random_str
+
+def generateTransactions(number, cross_proportion=0):
+    txs = []
+    cross = 0
+    for i in range(number):
+        from_hash = compute_hash(i)
+        to_hash = compute_hash(str(i)+"s")
+        amount = random.randint(0, 300)
+        if not cross_proportion:
+            from_shard = [i % shard_number]
+            to_shard = [i % shard_number]
+        else:
+            if(i/number <= cross_proportion):
+                from_shard = [ random.randint(0,shard_number) ]
+                to_shard = [ (from_shard[0] +1 ) % shard_number ]
+                cross += 1
+            else:
+                from_shard = to_shard = [i % shard_number]
+        payload = generate_random_str(stringlength)
+        txs.append(Transaction.new(from_hash,to_hash,from_shard,to_shard,amount,payload))
+    print("generate transactions:total:", number, "cross:", cross)
+    return txs
+
+def send_txs(nodes, transactions):
+    for idx,tx in enumerate(transactions) :
+        nodes[idx % N].add_tx(tx)
 
 if __name__ == "__main__":
-    print("----------------test Node----------------")
-    node = Node(1)
+    stringlength = 167
+    N = 4
+    B = 1000 
+    shard_number = 1
+    txs_per_node = 256
+    cross_proportion = 1
+    print("----------------test Node ----------------")
+    transactions = generateTransactions( N * txs_per_node ,cross_proportion)
+    nodes = get_nodes(shard_number, N, B)
     
-    txdata = {"from_hash":"0x11","to_hash":"0x12","amount":10}
-    tx = Transaction.new(txdata["from_hash"],txdata["to_hash"],1,2,100,"something payload")
-    node.add_tx(tx)
-    node.new_block()
-    node.add_block()
-    assert len(node.blockchain.ledger) == 2
-    print("success")
+    send_txs(nodes, transactions)
+    
+    a = time.time()
+    gls = []
+    for node in nodes:
+    #    gl = gevent.spawn(node.mine)
+       gl = gevent.spawn(node.mine_onetime)
+       gls.append(gl)
+    gevent.joinall(gls)
+    b = time.time()
+    print("process ",len(transactions),"transactions cost",b-a,'seconds. shard:',shard_number,"total nodes:",N)
+    print("finish")

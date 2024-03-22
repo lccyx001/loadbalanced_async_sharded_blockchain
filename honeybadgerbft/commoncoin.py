@@ -33,15 +33,15 @@ def commoncoin(sid,pid,N,f,public_key:TBLSPublicKey,private_key:TBLSPrivateKey,r
     
     def _message_check(sender,round):
         if sender not in range(N):
-            logger.warn("invalid sender value:{}".format(sender))
+            logger.error("invalid sender value:{}".format(sender))
             return False
         
         if round < 0:
-            logger.warn("invalid round value:{}".format(round))
+            logger.error("invalid round value:{}".format(round))
             return False
         
         if sender in received[round]:
-            logger.warn("redundant coin sig received：{} round:{} received:{}".format(pid,round,received))
+            logger.error("redundant coin sig received：{} round:{} received:{}".format(pid,round,received))
             return False
         return True
     

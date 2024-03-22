@@ -3,6 +3,10 @@ from hashlib import sha256
 import json
 import logging
 import time
+import gevent
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.honeybadger import HoneyBadgerBFT
+from loadbalanced_async_sharded_blockchain.honeybadgerbft.clientbase import ClientBase
+
 
 def compute_hash(data):
     json_data = json.dumps(data, sort_keys=True)
@@ -11,14 +15,14 @@ def compute_hash(data):
 class Transaction(object):
     
     @staticmethod
-    def new(from_hash,to_hash,from_shard,to_shard,amount,payload):
+    def new(from_hash_array,to_hash_array,from_shard_array,to_shard_array,amount_array,payload):
         raw_data = {
             "index":str(uuid.uuid1()),
-            "from_hash":from_hash,
-            "to_hash":to_hash,
-            "from_shard":from_shard,
-            "to_shard":to_shard,
-            "amount":amount,
+            "from_hash":from_hash_array,
+            "to_hash":to_hash_array,
+            "from_shard":from_shard_array,
+            "to_shard":to_shard_array,
+            "amount":amount_array,
             "payload":payload,
             }
         tx_hash = compute_hash(raw_data)
@@ -78,3 +82,37 @@ class BlockChain(object):
     def last_block(self):
         return self.ledger[-1]
     
+class HoneyBadgerBFTConcensus(object):
+    
+    logger = logging.getLogger("HoneyBadgerBFTConcensus")
+    
+    def __init__(self,config,) -> None:
+        
+        client = ClientBase(config.honeybadger_channels,config.honeybadger_host,config.honeybadger_port,config.N,config.id)
+        
+        self.rpc_thread = gevent.spawn(client.run_forever)
+        gevent.spawn(client.connect_broadcast_channel)
+        self.client = client
+        self.sid = "HoneyBadgerSID"
+        self.pid = config.id
+        
+    def concensus(self, transactions):
+        self.client.reset()
+        
+        hbbft = HoneyBadgerBFT(self.sid, self.pid,self.client)
+        hbbft.submit_txs(json.dumps(transactions,sort_keys=True))
+        gl = gevent.spawn(hbbft.run)
+        comfirmed_txjson = gl.get()
+        
+        if not comfirmed_txjson :
+            self.logger.info("failed one round concensus")
+            return []
+        
+        comfirmed_txs = []
+        for txjson in comfirmed_txjson:
+            txs = json.loads(txjson)
+            comfirmed_txs.extend(txs)
+        self.logger.info("finish one round concensus, txs:{}".format(len(comfirmed_txs)))
+        
+        return comfirmed_txs
+        

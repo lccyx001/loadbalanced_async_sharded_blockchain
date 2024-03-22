@@ -14,19 +14,14 @@ logging.basicConfig(level=logging.INFO,filename="log.log")
 class HoneyBadgerBFT(object):
     """HoneyBadgerBFT object used to run the protocol.
 
-    :param str sid: The base name of the common coin that will be used to
-        derive a nonce to uniquely identify the coin.
-    :param int pid: Node id.
-    :param int N: Number of nodes in the network.
-    :param int f: Number of faulty nodes that can be tolerated.
-    :param str sPK: Public key of the threshold signature
-        (:math:`\mathsf{TSIG}`) scheme.
-    :param str sSK: Signing key of the threshold signature
-        (:math:`\mathsf{TSIG}`) scheme.
-    :param str ePK: Public key of the threshold encryption
-        (:math:`\mathsf{TPKE}`) scheme.
-    :param str eSK: Signing key of the threshold encryption
-        (:math:`\mathsf{TPKE}`) scheme.
+    :param str sid: common coin会使用这个sid生成身份.
+    :param int pid: 节点id.
+    :param int N: 网络中节点总数.
+    :param int f: 能容忍的拜占庭节点数.
+    :param str sPK: 签名算法公钥.
+    :param str sSK: 签名算法私钥.
+    :param str ePK: 加密算法公钥.
+    :param str eSK: 加密算法私钥.
     :param send: gevent.queue.Queue.put_nowait
     :param recv: gevent.queue.Queue.get_nowait
     """
@@ -114,7 +109,7 @@ class HoneyBadgerBFT(object):
         # One instance of ACS
         acs = gevent.spawn(commonsubset, pid, N, f,rbc_out, self._client)
         all_gls.append(acs)
-        logger.info("{} round {} setup finish".format(pid,r))
+        # logger.info("{} round {} setup finish".format(pid,r))
 
         self._client.propose_set(tx_to_send)
 

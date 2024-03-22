@@ -69,7 +69,9 @@ def honeybadger_block(pid, N, f, ePK:TPKEPublicKey, eSK:TPKEPrivateKey, acs_out,
             tkey = deserialize_UVW(*tkey)
             key = ePK.combine_shares(*tkey, svec)
             plain = tpke.decrypt(key, ciph)
-            assert isinstance(plain, bytes)
+            if(not isinstance(plain,bytes)):
+                logger.error("plain not bytes:{}".format(plain))
+                continue
             decryptions.append(plain.decode())
         return decryptions
         
@@ -83,25 +85,25 @@ def honeybadger_block(pid, N, f, ePK:TPKEPublicKey, eSK:TPKEPrivateKey, acs_out,
     prop = propose_in()
     to_acs = encrypt(prop)
     acs_in(to_acs)
-    logger.info("{} input encrypt proposed value to acs.".format(pid))
+    # logger.info("{} input encrypt proposed value to acs.".format(pid))
     
     # Wait for the corresponding ACS to finish
     vall = acs_out()
     assert len(vall) == N
     assert len([_ for _ in vall if _ is not None]) >= N - f  # This many must succeed
-    logger.info("{} Received from acs".format(pid))
+    # logger.info("{} Received from acs".format(pid))
 
     # Broadcast all our decryption shares
     broadcast_shares(vall)
-    logger.info("{} broadcast shares".format(pid))
+    # logger.info("{} broadcast shares".format(pid))
 
     # Receive everyone's shares
     shares_received = {}
     receive_all_shares(shares_received)
     
     # assert len(shares_received) == N
-    logger.info("{} Receive shares".format(pid))
+    # logger.info("{} Receive shares".format(pid))
     decryptions = decrypt(vall,shares_received)
-    logger.info("{} honeybadgerBFT Done!".format(pid))
+    # logger.info("{} honeybadgerBFT Done!".format(pid))
     
     return tuple(decryptions)

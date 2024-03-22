@@ -35,7 +35,7 @@ def test_honeybader(clients,N=4):
         assert outs[0] == outs[1] == outs[2] == outs[3]
 
 def test_honeybader_2(clients,N=4):
-    loop_times = 3
+    loop_times = 30
     for loop in range(loop_times):
         print("loop",loop)
         badgers = []

@@ -70,5 +70,5 @@ def commonsubset(pid, N, f,rbc_out, client):
         else:
             r_threads[j].kill()
             rbc_values[j] = None
-    logger.info("{} finish acs phase".format(pid))
+    # logger.info("{} finish acs phase".format(pid))
     return tuple(rbc_values)

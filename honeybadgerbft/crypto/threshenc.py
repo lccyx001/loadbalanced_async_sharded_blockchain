@@ -142,8 +142,7 @@ class TPKEPublicKey(object):
         """ """
         assert 0 <= i < self.l
         Y_i = self.VKs[i]
-        assert pair(U_i, g2) == pair(U, Y_i)
-        return True
+        return pair(U_i, g2) == pair(U, Y_i)
 
     def combine_shares(self, U, V, W, shares):
         """ """

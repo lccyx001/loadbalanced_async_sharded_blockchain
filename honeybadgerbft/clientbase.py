@@ -45,7 +45,7 @@ class ClientBase(RPCBase):
         self.rbc_input = Queue() # only rbc leader will call this queue to receive input
         self.tpke_recv = Queue()
         self.proposed = Queue(1)
-        logger.info("{} reset.".format(self.id))
+        # logger.info("{} reset.".format(self.id))
 
     def recv(self,raw_message):
         logger.debug("recv:{}".format(raw_message))
