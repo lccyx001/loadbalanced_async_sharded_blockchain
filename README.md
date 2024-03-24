@@ -6,7 +6,12 @@
 
 安装docker charm基础环境
 ```sh
-docker pull sbellem/charm-crypto
+docker pull lccyx001/dagbc
+```
+
+启动镜像以dagbc-charm命名
+```sh
+docker run --name dagbc-charm -itd lccyx001/dagbc 
 ```
 
 更新依赖
