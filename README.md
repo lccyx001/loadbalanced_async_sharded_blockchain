@@ -17,7 +17,9 @@ apt-get install libgmp3-dev
 ```
 
 安装Python环境
-```
+```sh
+cd /root/loadbalanced_async_sharded_blockchain
+pip install -r requirement
 ```
 
 ## 启动服务
