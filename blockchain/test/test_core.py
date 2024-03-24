@@ -1,3 +1,5 @@
+import sys
+sys.path.append(r'../../..')
 from loadbalanced_async_sharded_blockchain.blockchain.core import *
 
 if __name__ == "__main__":

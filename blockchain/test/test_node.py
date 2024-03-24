@@ -1,3 +1,6 @@
+import sys
+sys.path.append(r'../../..')
+
 from loadbalanced_async_sharded_blockchain.blockchain.core import *
 from loadbalanced_async_sharded_blockchain.blockchain.node import Node
 import random
@@ -61,7 +64,7 @@ def test(nodes,N):
     print("process ",len(transactions),"transactions cost",b-a,'seconds. shard:',shard_number,"total nodes:",N,"average load is",total_load/N/8192,"MB")
 
 if __name__ == "__main__":
-    N = 32
+    N = 4
     shard_number = 8
     stringlength = 167
     B = 10000 

@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r'..')
+sys.path.append(r'../../..')
 import yaml
 
 
@@ -97,7 +97,7 @@ def generate_enc_secret(N,f):
     print("generate enc secret keys success.")
 
 if __name__ == "__main__":
-    N , f = 32, 8
+    N , f = 4, 1
     generate_config(N,f)
     generate_sign_secret(N,f)
     generate_enc_secret(N,f)
