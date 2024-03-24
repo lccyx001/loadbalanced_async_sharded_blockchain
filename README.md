@@ -14,12 +14,10 @@ docker pull lccyx001/dagbc
 docker run --name dagbc-charm -itd lccyx001/dagbc 
 ```
 
-更新依赖
-```sh
-sudo apt install gcc 
-sudo apt-get install -y autoconf automake build-essential libffi-dev libtool pkg-config python3-dev
-apt-get install libgmp3-dev
-```
+安装vscode,下载下面的插件
+"Docker"
+"DEV Containers"
+"Remote - ssh"
 
 安装Python环境
 ```sh
