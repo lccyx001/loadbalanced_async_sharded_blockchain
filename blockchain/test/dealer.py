@@ -96,10 +96,12 @@ def generate_enc_secret(N,f):
 
 if __name__ == "__main__":
     N , f , node_pershard= 8, 2, 4
-    host_array = ['172.19.18.14'] * node_pershard + ['172.19.18.8'] * node_pershard
+    # host_array = ['172.19.18.14'] * node_pershard + ['172.19.18.8'] * node_pershard # 修改这里ip
+    host_array = ['127.0.0.1'] * node_pershard + ['172.19.18.8'] * node_pershard # 修改这里ip
     generate_config(N,f,host_array,node_pershard)
-    generate_sign_secret(N,f)
-    generate_enc_secret(N,f)
+    if len(sys.argv)>1:
+        generate_sign_secret(N,f)
+        generate_enc_secret(N,f)
     
     
     

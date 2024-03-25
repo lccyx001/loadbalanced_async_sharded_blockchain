@@ -7,11 +7,8 @@ import random
 from faker import Faker
 fake = Faker()
 
-def get_nodes(shard_number, N, B):
-    nodes = [Node(i % shard_number, i, B) for i  in range(N)]
-    # print("shard:", shard_number, "per shard nodes:", N/shard_number ,)
-    # for node in nodes:
-    #     print("shard no",node.shard_no)
+def get_nodes(shard_no, no_start,no_end, B):
+    nodes = [Node(shard_no, i, B) for i  in range(no_start,no_end+1)]
     return nodes
 
 def generate_random_str(randomlength=16):
@@ -49,7 +46,8 @@ def generateTransactions(number, cross_proportion=0):
 
 def send_txs(nodes, transactions):
     for idx,tx in enumerate(transactions) :
-        nodes[idx % N].add_tx(tx)
+        nodes[idx % node_pershard].add_tx(tx)
+    print("finish send txs")
 
 def test(nodes,N):
     a = time.time()
@@ -64,15 +62,17 @@ def test(nodes,N):
     print("process ",len(transactions),"transactions cost",b-a,'seconds. shard:',shard_number,"total nodes:",N,"average load is",total_load/N/8192,"MB")
 
 if __name__ == "__main__":
-    N = 4
-    shard_number = 8
-    stringlength = 167
-    B = 10000 
+    N = 8
+    node_pershard = 4
+    shard_no = 1 # 2 3 4
+    shard_number = 2 # total shards
+    stringlength = 167 # tx payload
+    B = 10000 # tx pool batch
     txs_per_node = 256 
     cross_proportion = 0
     print("----------------test Node ----------------")
-    transactions = generateTransactions( N * txs_per_node ,cross_proportion)
-    nodes = get_nodes(shard_number, N, B)
+    transactions = generateTransactions( node_pershard * txs_per_node ,cross_proportion)
+    nodes = get_nodes(shard_no, 0, 3, B)
     send_txs(nodes, transactions)
     test(nodes,N)
     print("finish")
