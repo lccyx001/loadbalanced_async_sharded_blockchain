@@ -3,40 +3,38 @@ sys.path.append(r'../../..')
 import yaml
 
 
-def generate_config(N,f):
-    host_array = ['127.0.0.1'] * N
+def generate_config(N,f,host_array,node_pershard):
     common = {
         "pk":"pk",
         "N":N,
         "f":f,
-        "epk":"epk"
+        "epk":"epk" 
     }
     data = {"common":common,}
     for i in range(N):
         node_key = "node"+str(i)
         data[node_key] = {}
         data[node_key]['host'] = host_array[i]
-        data[node_key]['port'] = str(2+int(i/10))+str(i%10)+"01"
+        data[node_key]['port'] = "20"+str(i%node_pershard)+"1"
         channels = []
         badger_channels = []
         for j,host in enumerate(host_array):
             if i==j:
                 continue
-            uri = "tcp://"+host+":"+str(2+int(j/10))+str( (j)%10 )+"01"
+            uri = "tcp://"+host+":20"+str( j % node_pershard )+"1"
             channels.append([j,uri])
             
-            badger_uri = "tcp://"+host+":"+str(2+int(j/10))+str( (j)%10 )+"00"
+            badger_uri = "tcp://"+host+":20"+str( j % node_pershard )+"0"
             badger_channels.append([j,badger_uri])
         data[node_key]['channels'] = channels
         honeybadger = {
             "host":host_array[i],
-            "port":str(2+int(i/10))+str(i%10)+"00",
+            "port":"20"+str(i%node_pershard)+"0",
             "channels":badger_channels
         }
         data[node_key]["honeybadger"] = honeybadger
-    # print(data)
     with open('./config.yaml','w',encoding='utf-8') as f:
-        yaml.dump(data,stream=f,allow_unicode=True)
+        yaml.dump(data, stream=f, allow_unicode=True)
     print("generate yaml config success")
     
 def generate_sign_secret(N,f):
@@ -97,8 +95,9 @@ def generate_enc_secret(N,f):
     print("generate enc secret keys success.")
 
 if __name__ == "__main__":
-    N , f = 4, 1
-    generate_config(N,f)
+    N , f , node_pershard= 8, 2, 4
+    host_array = ['172.19.18.14'] * node_pershard + ['172.19.18.8'] * node_pershard
+    generate_config(N,f,host_array,node_pershard)
     generate_sign_secret(N,f)
     generate_enc_secret(N,f)
     
