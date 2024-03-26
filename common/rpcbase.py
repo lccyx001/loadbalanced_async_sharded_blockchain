@@ -31,3 +31,7 @@ class RPCBase(object):
 
     def stop(self):
         self.greenlet.kill()
+
+    def echo(self):
+        print("echo:",self.host,self.port)
+        
