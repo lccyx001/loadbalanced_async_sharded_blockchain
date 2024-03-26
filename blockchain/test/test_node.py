@@ -63,14 +63,14 @@ def test(nodes,N):
 
 if __name__ == "__main__":
     N = 8
-    node_pershard = 4
-    shard_no = 1 # 2 3 4
-    shard_number = 2 # total shards
-    stringlength = 167 # tx payload
-    B = 10000 # tx pool batch
-    start_no = 0
-    end_no = 3
+    shard_no = 1 # 2 3 4  修改这里的shard_no!!!
     txs_per_node = 256 
+    shard_number = 2 # total shards
+    B = 10000 # tx pool batch
+    node_pershard = 4 # constant
+    stringlength = 167 # constant tx payload
+    start_no = (shard_no-1) * 4
+    end_no = (shard_no)*4 - 1
     cross_proportion = 0
     print("----------------test Node ----------------")
     transactions = generateTransactions( node_pershard * txs_per_node ,cross_proportion)
