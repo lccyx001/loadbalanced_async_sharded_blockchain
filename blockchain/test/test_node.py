@@ -31,15 +31,15 @@ def generateTransactions(number, cross_proportion=0):
         to_hash = compute_hash(str(i)+"s")
         amount = random.randint(0, 300)
         if not cross_proportion:
-            from_shard = [i % shard_number]
-            to_shard = [i % shard_number]
+            from_shard = [shard_no]
+            to_shard = [shard_no]
         else:
             if(i/number <= cross_proportion):
                 from_shard = [ random.randint(0,shard_number) ]
                 to_shard = [ (from_shard[0] +1 ) % shard_number ]
                 cross += 1
             else:
-                from_shard = to_shard = [i % shard_number]
+                from_shard = to_shard = [shard_no]
         payload = generate_random_str(stringlength)
         txs.append(Transaction.new(from_hash,to_hash,from_shard,to_shard,amount,payload))
     print("generate transactions:total:", number, "cross:", cross)
@@ -47,7 +47,13 @@ def generateTransactions(number, cross_proportion=0):
 
 def send_txs(nodes, transactions):
     for idx,tx in enumerate(transactions) :
+        node_id = idx % node_pershard
+        node = nodes[node_id]
+        # print("send tx to",node.no,"has",len(node.cache))
         nodes[idx % node_pershard].add_tx(tx)
+    # print("nodes",nodes)
+    for node in nodes:
+        print("node",node.no,"recieved",len(node.cache),"txs.")
     print("finish send txs")
 
 def test(nodes,N):
@@ -81,5 +87,7 @@ if __name__ == "__main__":
     transactions = generateTransactions( node_pershard * txs_per_node ,cross_proportion)
     nodes = get_nodes(shard_no, start_no, end_no, B)
     send_txs(nodes, transactions)
+    input("输入任意字符开始进行共识")
+    print("开始共识")
     test(nodes,N)
     print("finish")

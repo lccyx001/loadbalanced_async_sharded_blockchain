@@ -42,6 +42,7 @@ class Node(object):
         from_shard_array = transaction.get('from_shard')
         to_shard_array = transaction.get('to_shard')
         if self.shard_no not in from_shard_array or self.shard_no not in to_shard_array:
+            print("not in same shard, return")
             return
         self.cache.append(transaction)
         
