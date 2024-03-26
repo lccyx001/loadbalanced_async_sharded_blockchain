@@ -1,0 +1,16 @@
+common:
+  N: 8
+  shard_numbers: 2
+  nodes_per_shard: 4
+dealer:
+  f: 2
+  shard1: 
+    - '127.0.0.1'
+    - '172.19.18.8'
+  shard2:
+    - '172.19.18.14'
+    - '127.0.0.1'
+test:
+  txs_per_node: 256 # 每个节点处理多少交易
+  cross_proportion: 0
+  B: 10000

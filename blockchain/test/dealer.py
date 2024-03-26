@@ -95,11 +95,17 @@ def generate_enc_secret(N,f):
     print("generate enc secret keys success.")
 
 if __name__ == "__main__":
-    N , f , node_pershard= 8, 2, 4
-    # host_array = ['172.19.18.14'] * node_pershard + ['172.19.18.8'] * node_pershard # 修改这里ip
-    host_array = ['127.0.0.1'] * node_pershard + ['172.19.18.8'] * node_pershard # 修改这里ip
+    config = None
+    with open('test_node.yaml','r') as file:
+        config = yaml.safe_load(file)
+    N , f , node_pershard= config['common']['N'], config['dealer']['f'], config['common']['nodes_per_shard']
+    
+    shard_hosts = config['dealer'][sys.argv[1]]
+    host_array = []
+    for shard_host in shard_hosts:
+        host_array += [shard_host] * node_pershard
     generate_config(N,f,host_array,node_pershard)
-    if len(sys.argv)>1:
+    if len(sys.argv)>2:
         generate_sign_secret(N,f)
         generate_enc_secret(N,f)
     

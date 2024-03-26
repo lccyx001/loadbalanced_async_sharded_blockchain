@@ -62,16 +62,20 @@ def test(nodes,N):
     print("process ",len(transactions),"transactions cost",b-a,'seconds. shard:',shard_number,"total nodes:",N,"average load is",total_load/N/8192,"MB")
 
 if __name__ == "__main__":
-    N = 8
-    shard_no = 1 # 2 3 4  修改这里的shard_no!!!
-    txs_per_node = 256 
-    shard_number = 2 # total shards
-    B = 10000 # tx pool batch
-    node_pershard = 4 # constant
-    stringlength = 167 # constant tx payload
-    start_no = (shard_no-1) * 4
-    end_no = (shard_no)*4 - 1
-    cross_proportion = 0
+    config = None
+    with open('test_node.yaml','r') as file:
+        config = yaml.safe_load(file)
+        
+    N = config['common']['N'] # 节点总数
+    shard_no = sys.argv[1] # 2 3 4  分片序号
+    txs_per_node = config['test']['txs_per_node']  # 每个节点处理多少交易
+    shard_number = config['common']['shard_numbers'] # 分片总数
+    B = config['test']['B'] # tx pool batch
+    node_pershard = config['common']['nodes_per_shard'] # 每个分片几个节点
+    stringlength = 167 # 交易载荷长度
+    start_no = (shard_no-1) * node_pershard
+    end_no = (shard_no) * node_pershard - 1
+    cross_proportion = config['test']['cross_proportion']
     print("----------------test Node ----------------")
     transactions = generateTransactions( node_pershard * txs_per_node ,cross_proportion)
     nodes = get_nodes(shard_no, start_no, end_no, B)
