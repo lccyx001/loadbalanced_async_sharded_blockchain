@@ -68,11 +68,13 @@ if __name__ == "__main__":
     shard_number = 2 # total shards
     stringlength = 167 # tx payload
     B = 10000 # tx pool batch
+    start_no = 0
+    end_no = 3
     txs_per_node = 256 
     cross_proportion = 0
     print("----------------test Node ----------------")
     transactions = generateTransactions( node_pershard * txs_per_node ,cross_proportion)
-    nodes = get_nodes(shard_no, 0, 3, B)
+    nodes = get_nodes(shard_no, start_no, end_no, B)
     send_txs(nodes, transactions)
     test(nodes,N)
     print("finish")
