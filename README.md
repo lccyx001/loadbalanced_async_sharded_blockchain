@@ -25,40 +25,30 @@ cd /root/loadbalanced_async_sharded_blockchain
 pip install -r requirement
 ```
 
-## 启动服务
-启动区块链服务
-```
-```
+## 测试1
 
-
-运行共识模块
-```
+在不同机器上执行下面的步骤
+```sh
+cd blockchain/test/
 ```
 
-A loadbalanced async sharded blockchain demo.
-
-Now under developing.
-
-How to eastablish it?
-
-Install docker
-
-```
-docker pull sbellem/charm-crypto
+修改test_node.yaml 文件中的分片参数，N参数，先运行dealer.py,生成分片1的所有配置以及公私钥文件
+```sh
+python dealer.py shard1 a
 ```
 
-Update dependencys:
-```
-sudo apt install gcc 
-sudo apt-get install -y autoconf automake build-essential libffi-dev libtool pkg-config python3-dev
-apt-get install libgmp3-dev
+启动node1节点，生成测试数据，等待其他节点进行共识
+```sh
+python test_node.py 1
 ```
 
-TODO list:
+切换其他节点，更新公私钥文件（通过git pull），生成分片2的配置
+```sh
+python dealer.py shard2
+```
+启动分片2的节点
+```sh
+python test_node.py 2
+```
 
-```
-1. Using DAG 
-2. Blockchain ledger out of memory
-3. Using loadbalancing
-4. Blockchain concensus can run multiple rounds
-```
+按下任意键进行共识。
