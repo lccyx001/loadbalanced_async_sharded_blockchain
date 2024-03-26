@@ -14,7 +14,7 @@ def generate_config(N,f,host_array,node_pershard):
     for i in range(N):
         node_key = "node"+str(i)
         data[node_key] = {}
-        data[node_key]['host'] = host_array[i]
+        data[node_key]['host'] = '0.0.0.0'
         data[node_key]['port'] = "20"+str(i%node_pershard)+"1"
         channels = []
         badger_channels = []
@@ -28,7 +28,7 @@ def generate_config(N,f,host_array,node_pershard):
             badger_channels.append([j,badger_uri])
         data[node_key]['channels'] = channels
         honeybadger = {
-            "host":host_array[i],
+            "host":'0.0.0.0',
             "port":"20"+str(i%node_pershard)+"0",
             "channels":badger_channels
         }
