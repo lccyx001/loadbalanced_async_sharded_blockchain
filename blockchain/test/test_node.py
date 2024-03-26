@@ -1,6 +1,7 @@
 import sys
 sys.path.append(r'../../..')
 
+import yaml
 from loadbalanced_async_sharded_blockchain.blockchain.core import *
 from loadbalanced_async_sharded_blockchain.blockchain.node import Node
 import random
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
         
     N = config['common']['N'] # 节点总数
-    shard_no = sys.argv[1] # 2 3 4  分片序号
+    shard_no =int( sys.argv[1] ) # 2 3 4  分片序号
     txs_per_node = config['test']['txs_per_node']  # 每个节点处理多少交易
     shard_number = config['common']['shard_numbers'] # 分片总数
     B = config['test']['B'] # tx pool batch
